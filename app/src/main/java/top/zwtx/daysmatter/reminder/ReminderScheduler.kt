@@ -1,13 +1,13 @@
-package io.github.wynnok.daysmatter.reminder
+package top.zwtx.daysmatter.reminder
 
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import io.github.wynnok.daysmatter.data.Event
-import io.github.wynnok.daysmatter.data.LocalStore
-import io.github.wynnok.daysmatter.data.Snapshot
+import top.zwtx.daysmatter.data.Event
+import top.zwtx.daysmatter.data.LocalStore
+import top.zwtx.daysmatter.data.Snapshot
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId

@@ -1,6 +1,6 @@
-package io.github.wynnok.daysmatter.data
+package top.zwtx.daysmatter.data
 
-import io.github.wynnok.daysmatter.BuildConfig
+import top.zwtx.daysmatter.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray

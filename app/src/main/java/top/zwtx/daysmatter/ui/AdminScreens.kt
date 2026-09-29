@@ -1,10 +1,11 @@
-package io.github.wynnok.daysmatter.ui
+package top.zwtx.daysmatter.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import io.github.wynnok.daysmatter.MainViewModel
+import top.zwtx.daysmatter.MainViewModel
 import org.json.JSONObject
 
 @Composable
@@ -54,14 +54,18 @@ fun CategoryListScreen(
   val categories = vm.snapshot?.categories.orEmpty()
   var deleteId by remember { mutableStateOf<Int?>(null) }
   Column(Modifier.fillMaxSize().padding(contentPadding)) {
-    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-      Text("共 ${categories.size} 个分类", modifier = Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth().padding(horizontal = AppDimens.drawerInnerGutter,
+      vertical = AppDimens.drawerInnerGutter),
+      verticalAlignment = Alignment.CenterVertically) {
+      Text("共 ${categories.size} 个分类", style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
       TextButton(onClick = onAdd) { Text("添加分类") }
     }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(16.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.drawerInnerGutter),
+      contentPadding = PaddingValues(horizontal = AppDimens.drawerInnerGutter, vertical = 4.dp)) {
       items(categories, key = { it.id }) { category ->
-        Card(Modifier.fillMaxWidth()) {
-          Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        GlassPanel {
+          Row(Modifier.padding(AppDimens.drawerCardInset), verticalAlignment = Alignment.CenterVertically) {
             CategoryIcon(category.icon, category.color)
             Spacer(Modifier.width(12.dp))
             Text(category.name, modifier = Modifier.weight(1f))
@@ -98,27 +102,29 @@ fun CategoryEditorScreen(vm: MainViewModel, categoryId: Int?, onSaved: () -> Uni
   }
 
   Column(
-    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
+    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
+      .padding(AppDimens.drawerInnerGutter),
+    verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
   ) {
     OutlinedTextField(name, { name = it }, label = { Text("分类名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     Text("颜色", style = MaterialTheme.typography.titleMedium)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       colors.forEach { option ->
         Box(
-          Modifier.size(if (color == option) 36.dp else 32.dp)
-            .clip(MaterialTheme.shapes.small).background(categoryColor(option))
-            .clickable { color = option },
+          Modifier.size(AppDimens.controlHeight).clickable { color = option },
           contentAlignment = Alignment.Center
         ) {
-          if (color == option) Text("✓", color = androidx.compose.ui.graphics.Color.White)
+          Box(Modifier.size(36.dp).clip(MaterialTheme.shapes.small)
+            .background(categoryColor(option)), contentAlignment = Alignment.Center) {
+            if (color == option) Text("✓", color = androidx.compose.ui.graphics.Color.White)
+          }
         }
       }
     }
     Text("图标", style = MaterialTheme.typography.titleMedium)
     OutlinedTextField(search, { search = it }, label = { Text("搜索图标，例如：生日、旅行、heart") }, modifier = Modifier.fillMaxWidth())
     LazyVerticalGrid(
-      columns = GridCells.Fixed(5), modifier = Modifier.fillMaxWidth().height(300.dp),
+      columns = GridCells.Adaptive(AppDimens.controlHeight), modifier = Modifier.fillMaxWidth().height(240.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
       gridItems(icons) { id ->
@@ -141,7 +147,9 @@ fun CategoryEditorScreen(vm: MainViewModel, categoryId: Int?, onSaved: () -> Uni
         vm.write(if (categoryId == null) "POST" else "PUT",
           if (categoryId == null) "/categories" else "/categories/$categoryId", body, onSaved)
       }
-    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("保存分类") }
+    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
+      Text("保存分类")
+    }
   }
 }
 
@@ -161,15 +169,16 @@ fun ChannelListScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Int) -> Uni
   val channels = vm.snapshot?.channels.orEmpty()
   var deleteId by remember { mutableStateOf<Int?>(null) }
   Column(Modifier.fillMaxSize().padding(contentPadding)) {
-    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(AppDimens.pageGutter), verticalAlignment = Alignment.CenterVertically) {
       Text("Webhook 提醒", modifier = Modifier.weight(1f))
       TextButton(onClick = onAdd) { Text("添加渠道") }
     }
-    if (channels.isEmpty()) Text("还没有 Webhook 渠道", modifier = Modifier.padding(16.dp))
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(16.dp)) {
+    if (channels.isEmpty()) Text("还没有 Webhook 渠道", modifier = Modifier.padding(AppDimens.pageGutter))
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap),
+      contentPadding = PaddingValues(AppDimens.pageGutter)) {
       items(channels, key = { it.id }) { channel ->
-        Card(Modifier.fillMaxWidth()) {
-          Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        GlassPanel {
+          Row(Modifier.padding(AppDimens.cardInset), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
               Text(channel.name, style = MaterialTheme.typography.titleSmall)
               Text("${channel.format} · ${if (channel.active) "已启用" else "已停用"}", style = MaterialTheme.typography.bodySmall)
@@ -209,30 +218,34 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
   )
 
   Column(
-    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(14.dp)
+    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
+      .padding(AppDimens.pageGutter),
+    verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
   ) {
-    OutlinedTextField(name, { name = it }, label = { Text("渠道名称") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(account, { account = it }, label = { Text("Webhook HTTPS 地址") }, modifier = Modifier.fillMaxWidth())
-    SelectionField("消息格式", format, formats, { format = it })
-    OutlinedTextField(
-      token, { token = it }, label = { Text(if (existing?.hasAuthToken == true) "Token（留空保持原值）" else "Token（可选）") },
-      modifier = Modifier.fillMaxWidth()
-    )
-    if (format == "custom") {
+    FormSection("渠道信息") {
+      OutlinedTextField(name, { name = it }, label = { Text("渠道名称") }, modifier = Modifier.fillMaxWidth())
+      OutlinedTextField(account, { account = it }, label = { Text("Webhook HTTPS 地址") }, modifier = Modifier.fillMaxWidth())
+      SelectionField("消息格式", format, formats, { format = it })
       OutlinedTextField(
-        template, { template = it }, label = { Text("自定义 JSON 模板") },
-        minLines = 5, modifier = Modifier.fillMaxWidth()
+        token, { token = it }, label = { Text(if (existing?.hasAuthToken == true) "Token（留空保持原值）" else "Token（可选）") },
+        modifier = Modifier.fillMaxWidth()
       )
-      Text("支持 {{event_name}}、{{target_date}}、{{days}} 等占位符", style = MaterialTheme.typography.bodySmall)
-    }
-    if (channelId != null) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("启用渠道", modifier = Modifier.weight(1f))
-        Switch(active, { active = it })
+      if (format == "custom") {
+        OutlinedTextField(
+          template, { template = it }, label = { Text("自定义 JSON 模板") },
+          minLines = 5, modifier = Modifier.fillMaxWidth()
+        )
+        Text("支持 {{event_name}}、{{target_date}}、{{days}} 等占位符", style = MaterialTheme.typography.bodySmall)
       }
-    } else {
-      Text("新渠道保存后默认启用")
+      if (channelId != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text("启用渠道", modifier = Modifier.weight(1f))
+          Switch(active, { active = it })
+        }
+      } else {
+        Text("新渠道保存后默认启用", style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant)
+      }
     }
     Button(onClick = {
       if (!account.startsWith("https://") || name.isBlank()) {
@@ -249,6 +262,8 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
         vm.write(if (channelId == null) "POST" else "PUT",
           if (channelId == null) "/remind-channels" else "/remind-channels/$channelId", body, onSaved)
       }
-    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("保存渠道") }
+    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
+      Text("保存渠道")
+    }
   }
 }

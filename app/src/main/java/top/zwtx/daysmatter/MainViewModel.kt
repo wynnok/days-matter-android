@@ -1,4 +1,4 @@
-package io.github.wynnok.daysmatter
+package top.zwtx.daysmatter
 
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -6,15 +6,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.wynnok.daysmatter.data.ApiException
-import io.github.wynnok.daysmatter.data.AppRepository
-import io.github.wynnok.daysmatter.data.LocalReminder
-import io.github.wynnok.daysmatter.data.LocalStore
-import io.github.wynnok.daysmatter.data.Session
-import io.github.wynnok.daysmatter.data.Snapshot
-import io.github.wynnok.daysmatter.reminder.ReminderScheduler
+import top.zwtx.daysmatter.data.ApiException
+import top.zwtx.daysmatter.data.AppRepository
+import top.zwtx.daysmatter.data.LocalReminder
+import top.zwtx.daysmatter.data.LocalStore
+import top.zwtx.daysmatter.data.Session
+import top.zwtx.daysmatter.data.Snapshot
+import top.zwtx.daysmatter.reminder.ReminderScheduler
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.io.IOException
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
   val store = LocalStore(application)
@@ -27,11 +28,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private set
   var busy by mutableStateOf(false)
     private set
+  var refreshing by mutableStateOf(false)
+    private set
   var offline by mutableStateOf(false)
     private set
-  var message by mutableStateOf<String?>(null)
+  var syncFailed by mutableStateOf(false)
     private set
-  var darkMode by mutableStateOf(store.darkMode())
+  var message by mutableStateOf<String?>(null)
     private set
   var gridMode by mutableStateOf(store.gridMode())
     private set
@@ -42,18 +45,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
   fun clearMessage() { message = null }
 
-  fun setDarkMode(enabled: Boolean) {
-    darkMode = enabled
-    store.setDarkMode(enabled)
-  }
-
-  fun setGridMode(enabled: Boolean) {
+  fun updateGridMode(enabled: Boolean) {
     gridMode = enabled
     store.setGridMode(enabled)
   }
 
-  private fun report(error: Exception) {
-    if (error is ApiException && error.code == 401 && session != null) {
+  private fun report(error: Exception, requestedSession: Session? = null) {
+    if (requestedSession != null && session !== requestedSession) return
+    if (error is ApiException && error.code == 401 && requestedSession != null) {
       logout()
       message = "登录已失效，请重新登录"
     } else {
@@ -62,52 +61,80 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
   }
 
   private suspend fun load(session: Session) {
-    snapshot = repository.refresh(session)
-    snapshot?.let { scheduler.reschedule(session.userId, it) }
+    if (this.session !== session) return
+    val refreshed = repository.refresh(session)
+    if (this.session !== session) return
+    snapshot = refreshed
+    scheduler.reschedule(session.userId, refreshed)
     offline = false
+    syncFailed = false
   }
 
   fun refresh() {
     val current = session ?: return
+    if (busy) return
     viewModelScope.launch {
       busy = true
+      refreshing = true
       try {
         load(current)
       } catch (error: Exception) {
-        offline = true
-        report(error)
+        if (session === current) {
+          offline = error is IOException
+          syncFailed = error !is ApiException || error.code != 401
+          report(error, current)
+        }
       } finally {
-        busy = false
+        if (session === current) {
+          refreshing = false
+          busy = false
+        }
       }
     }
   }
 
   fun login(email: String, password: String) {
+    if (busy) return
     viewModelScope.launch {
+      var authenticated: Session? = null
       busy = true
       try {
         session = repository.login(email.trim(), password)
-        snapshot = null
+        authenticated = session
+        snapshot = session?.let { store.loadSnapshot(it.userId) }
+        offline = false
+        syncFailed = false
         load(session!!)
       } catch (error: Exception) {
-        report(error)
+        val current = session
+        offline = current != null && error is IOException
+        syncFailed = current != null && (error !is ApiException || error.code != 401)
+        report(error, current)
       } finally {
-        busy = false
+        if (session === authenticated) busy = false
       }
     }
   }
 
   fun register(name: String, email: String, password: String) {
+    if (busy) return
     viewModelScope.launch {
+      var authenticated: Session? = null
       busy = true
       try {
         session = repository.register(name.trim(), email.trim(), password)
+        authenticated = session
         snapshot = null
+        offline = false
+        syncFailed = false
         load(session!!)
       } catch (error: Exception) {
-        report(error)
+        val current = session
+        offline = current != null && error is IOException
+        syncFailed = current != null && (error !is ApiException || error.code != 401)
+        report(error, current)
       } finally {
-        busy = false
+        if (session === authenticated) busy = false
       }
     }
   }
@@ -120,6 +147,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     session = null
     snapshot = null
     offline = false
+    syncFailed = false
+    busy = false
+    refreshing = false
   }
 
   fun localReminder(eventId: Int): LocalReminder =
@@ -134,14 +164,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
           current, if (eventId == null) "POST" else "PUT",
           if (eventId == null) "/events" else "/events/$eventId", body
         )
+        if (session !== current) return@launch
         val id = eventId ?: result.getInt("event_id")
         store.saveLocalReminder(current.userId, id, reminder)
         load(current)
-        onDone(id)
+        if (session === current) onDone(id)
       } catch (error: Exception) {
-        report(error)
+        report(error, current)
       } finally {
-        busy = false
+        if (session === current) busy = false
       }
     }
   }
@@ -152,6 +183,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
       busy = true
       try {
         repository.write(current, method, path, body)
+        if (session !== current) return@launch
         if (method == "DELETE" && path.startsWith("/events/")) {
           path.substringAfterLast('/').toIntOrNull()?.let { id ->
             scheduler.cancel(current.userId, id)
@@ -159,11 +191,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
           }
         }
         load(current)
-        onDone()
+        if (session === current) onDone()
       } catch (error: Exception) {
-        report(error)
+        report(error, current)
       } finally {
-        busy = false
+        if (session === current) busy = false
       }
     }
   }
@@ -173,11 +205,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch {
       busy = true
       try {
-        onReady(repository.exportData(current).toString(2))
+        val data = repository.exportData(current)
+        if (session === current) onReady(data.toString(2))
       } catch (error: Exception) {
-        report(error)
+        report(error, current)
       } finally {
-        busy = false
+        if (session === current) busy = false
       }
     }
   }
@@ -189,11 +222,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
       try {
         repository.importData(current, JSONObject(text))
         load(current)
-        onDone()
+        if (session === current) onDone()
       } catch (error: Exception) {
-        report(error)
+        report(error, current)
       } finally {
-        busy = false
+        if (session === current) busy = false
       }
     }
   }

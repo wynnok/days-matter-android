@@ -8,11 +8,11 @@ val apiBaseUrl = providers.gradleProperty("apiBaseUrl")
   .get()
 
 android {
-  namespace = "io.github.wynnok.daysmatter"
+  namespace = "top.zwtx.daysmatter"
   compileSdk = 37
 
   defaultConfig {
-    applicationId = "io.github.wynnok.daysmatter"
+    applicationId = "top.zwtx.daysmatter"
     minSdk = 26
     targetSdk = 36
     versionCode = 1
@@ -54,4 +54,6 @@ dependencies {
   implementation("androidx.core:core-ktx:1.18.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
   implementation("cn.6tail:lunar:1.7.7")
+  implementation("dev.chrisbanes.haze:haze:1.7.3")
+  implementation("dev.chrisbanes.haze:haze-materials:1.7.3")
 }

@@ -1,4 +1,4 @@
-package io.github.wynnok.daysmatter.data
+package top.zwtx.daysmatter.data
 
 import android.content.Context
 import android.util.Base64
@@ -64,12 +64,6 @@ class LocalStore(private val context: Context) {
     Snapshot.fromJson(JSONObject(cacheFile(userId).readText(Charsets.UTF_8)))
   } catch (_: Exception) {
     null
-  }
-
-  fun darkMode() = preferences.getBoolean("dark_mode", false)
-
-  fun setDarkMode(enabled: Boolean) {
-    preferences.edit().putBoolean("dark_mode", enabled).apply()
   }
 
   fun gridMode() = preferences.getBoolean("grid_mode", false)

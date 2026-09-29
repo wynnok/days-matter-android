@@ -1,5 +1,11 @@
 # Third-party notices
 
+## Haze 1.7.3
+
+Copyright (c) Chris Banes and contributors. Licensed under the Apache License, Version 2.0.
+
+Source: [chrisbanes/haze](https://github.com/chrisbanes/haze). License: [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
 ## lunar-java 1.7.7
 
 Copyright (c) 2018 6tail. Licensed under the MIT License.

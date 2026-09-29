@@ -1,6 +1,6 @@
-package io.github.wynnok.daysmatter.ui
+package top.zwtx.daysmatter.ui
 
-import io.github.wynnok.daysmatter.R
+import top.zwtx.daysmatter.R
 
 object CategoryIconResources {
   val ids = listOf("briefcase", "office", "laptop", "graduation", "book", "pencil", "clipboard", "trophy", "target", "megaphone", "heart", "star", "rings", "gift", "flame", "infinity", "handshake", "cake", "party", "balloon", "plane", "map", "camera", "compass", "mountain", "beach", "home", "train", "car", "ship", "wallet", "creditCard", "banknote", "piggyBank", "coins", "percent", "shoppingBag", "shoppingCart", "receipt", "dumbbell", "activity", "pill", "stethoscope", "coffee", "utensils", "wine", "music", "film", "gamepad", "tv", "smartphone", "shirt", "palette", "baby", "dog", "cat", "flower", "tree", "leaf", "clock", "hourglass", "alarmClock", "lightbulb", "rocket", "key", "wrench", "bell", "hash", "flag", "sun", "moon", "cloud", "umbrella", "snowflake", "sunrise", "users", "phone", "globe", "microphone", "headphones", "bicycle", "fileText", "award")

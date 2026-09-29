@@ -5,12 +5,16 @@ Kotlin + Jetpack Compose Android client for the existing Days Matter Cloudflare 
 ## Features
 
 - Login and registration with existing accounts
-- Event list and detail, category filters, grid/list layout, pinning, repeat rules, and sub-events
+- Event list and detail, pull-to-refresh, category drawer filters, grid/list layout, pinning, repeat rules, and sub-events
 - Solar and lunar date entry, using the same `lunar-java` family as the Worker’s lunar library
 - Category color/icon management and the existing 83 category icon identifiers
-- Webhook channels, profile editing, dark mode, JSON import and export
+- Webhook channels, profile editing, system-following dark mode, JSON import and export
 - Device-local reminders, separate from Webhook channels; the next occurrence is scheduled using the Worker’s Asia/Shanghai date result
-- Cached event data for offline reading; changes require a network connection, and syncing resumes when connectivity returns or the user taps refresh
+- Cached event data for offline reading; changes require a network connection, and syncing resumes when connectivity returns or the user pulls down to refresh
+
+## Design language
+
+The interface treats dates as a quiet journal: warm neutral surfaces, slate text and actions, and one dark summary card for the next event. Page gutters are 20 dp, card insets 18 dp, item gaps 12 dp, and section gaps 20 dp. The drawer combines a 12 dp outer inset with an 8 dp inner inset to keep the same alignment. Form fields are 56 dp high and action buttons are 48 dp high. Frosted blur is reserved for the floating navigation; content panels use solid surfaces and fine borders for readability. The shared values live in `ui/Theme.kt`.
 
 ## Build
 

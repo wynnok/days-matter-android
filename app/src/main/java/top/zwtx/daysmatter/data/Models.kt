@@ -1,4 +1,4 @@
-package io.github.wynnok.daysmatter.data
+package top.zwtx.daysmatter.data
 
 import org.json.JSONArray
 import org.json.JSONObject

@@ -1,9 +1,9 @@
-package io.github.wynnok.daysmatter.reminder
+package top.zwtx.daysmatter.reminder
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import io.github.wynnok.daysmatter.data.LocalStore
+import top.zwtx.daysmatter.data.LocalStore
 
 class RescheduleReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {

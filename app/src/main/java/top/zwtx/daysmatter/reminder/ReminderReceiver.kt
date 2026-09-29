@@ -1,4 +1,4 @@
-package io.github.wynnok.daysmatter.reminder
+package top.zwtx.daysmatter.reminder
 
 import android.Manifest
 import android.app.Notification
@@ -10,8 +10,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import io.github.wynnok.daysmatter.MainActivity
-import io.github.wynnok.daysmatter.R
+import top.zwtx.daysmatter.MainActivity
+import top.zwtx.daysmatter.R
 
 class ReminderReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {

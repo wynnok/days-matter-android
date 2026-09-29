@@ -1,4 +1,4 @@
-package io.github.wynnok.daysmatter.ui
+package top.zwtx.daysmatter.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

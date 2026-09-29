@@ -1,4 +1,4 @@
-package io.github.wynnok.daysmatter.ui
+package top.zwtx.daysmatter.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -11,12 +11,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -32,8 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import io.github.wynnok.daysmatter.MainViewModel
-import io.github.wynnok.daysmatter.data.LocalReminder
+import top.zwtx.daysmatter.MainViewModel
+import top.zwtx.daysmatter.data.LocalReminder
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.ZoneId
@@ -74,8 +74,9 @@ fun EventEditorScreen(
   }
 
   Column(
-    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(22.dp)
+    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
+      .padding(AppDimens.pageGutter),
+    verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
   ) {
     FormSection("基本信息") {
       OutlinedTextField(name, { name = it }, label = { Text("事件名称 *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -128,8 +129,9 @@ fun EventEditorScreen(
         TimeField("提醒时间（北京时间）", remindTime, { remindTime = it })
       }
     }
-    Card(Modifier.fillMaxWidth()) {
-      Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    GlassPanel {
+      Column(Modifier.padding(AppDimens.cardInset),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
         Text("手机本地提醒", style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text("在这台设备上通知", modifier = Modifier.weight(1f))
@@ -179,7 +181,9 @@ fun EventEditorScreen(
           vm.saveEvent(eventId, body, LocalReminder(localEnabled, localAdvance, localTime), onSaved)
         }
       }
-    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("保存倒数日") }
+    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
+      Text("保存倒数日")
+    }
   }
 
   if (showLunarPicker) {
@@ -233,16 +237,19 @@ fun SubEventEditorScreen(
   var showLunarPicker by remember { mutableStateOf(false) }
 
   Column(
-    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
+    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
+      .padding(AppDimens.pageGutter),
+    verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
   ) {
-    OutlinedTextField(name, { name = it }, label = { Text("子事件名称") }, modifier = Modifier.fillMaxWidth())
-    SelectionField("日期类型", dateType.toString(), listOf("0" to "公历", "1" to "农历"), { dateType = it.toInt() })
-    if (dateType == 0) {
-      SolarDateField("目标日期", targetDate, { targetDate = it })
-    } else {
-      Text("${lunarLabel(targetDate) ?: "农历日期"} · 对应公历 $targetDate")
-      TextButton(onClick = { showLunarPicker = true }) { Text("选择农历日期") }
+    FormSection("子事件信息") {
+      OutlinedTextField(name, { name = it }, label = { Text("子事件名称") }, modifier = Modifier.fillMaxWidth())
+      SelectionField("日期类型", dateType.toString(), listOf("0" to "公历", "1" to "农历"), { dateType = it.toInt() })
+      if (dateType == 0) {
+        SolarDateField("目标日期", targetDate, { targetDate = it })
+      } else {
+        Text("${lunarLabel(targetDate) ?: "农历日期"} · 对应公历 $targetDate")
+        TextButton(onClick = { showLunarPicker = true }) { Text("选择农历日期") }
+      }
     }
     Button(onClick = {
       if (name.isBlank() || name.length > 100) {
@@ -258,7 +265,9 @@ fun SubEventEditorScreen(
           body, onSaved
         )
       }
-    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) { Text("保存子事件") }
+    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
+      Text("保存子事件")
+    }
   }
   if (showLunarPicker) {
     LunarPickerDialog(targetDate, onDismiss = { showLunarPicker = false }) {

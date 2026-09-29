@@ -1,4 +1,4 @@
-package io.github.wynnok.daysmatter.ui
+package top.zwtx.daysmatter.ui
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Card
@@ -15,6 +16,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.Date
@@ -55,7 +61,7 @@ fun OfflineBanner(syncedAt: Long?) {
       timeZone = TimeZone.getTimeZone("Asia/Shanghai")
     }.format(Date(it))
   }
-  Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+  Card(Modifier.fillMaxWidth().padding(horizontal = AppDimens.pageGutter, vertical = 4.dp)) {
     Text(
       "当前离线，显示${time?.let { " $it 同步的" } ?: ""}缓存数据。编辑需要联网。",
       modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall
@@ -81,8 +87,11 @@ fun SelectionField(
   var expanded by remember { mutableStateOf(false) }
   Column(modifier) {
     Text(label, style = MaterialTheme.typography.labelMedium)
-    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-      Text(choices.firstOrNull { it.first == selected }?.second ?: "请选择")
+    OutlinedButton(onClick = { expanded = true },
+      modifier = Modifier.fillMaxWidth().height(AppDimens.fieldHeight)) {
+      Text(choices.firstOrNull { it.first == selected }?.second ?: "请选择",
+        modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+      Icon(Icons.Default.KeyboardArrowDown, null)
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
       choices.forEach { (value, title) ->
@@ -107,8 +116,9 @@ fun SolarDateField(label: String, value: String, onChange: (String) -> Unit) {
         { _, year, month, day -> onChange("%04d-%02d-%02d".format(year, month + 1, day)) },
         initial.year, initial.monthValue - 1, initial.dayOfMonth
       ).show()
-    }, modifier = Modifier.fillMaxWidth()) {
-      Text(value.ifBlank { "选择日期" })
+    }, modifier = Modifier.fillMaxWidth().height(AppDimens.fieldHeight)) {
+      Text(value.ifBlank { "选择日期" }, modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+      Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(18.dp))
     }
   }
 }
@@ -125,14 +135,20 @@ fun TimeField(label: String, value: String, onChange: (String) -> Unit) {
       TimePickerDialog(context, { _, selectedHour, selectedMinute ->
         onChange("%02d:%02d".format(selectedHour, selectedMinute))
       }, hour, minute, true).show()
-    }, modifier = Modifier.fillMaxWidth()) { Text(value.take(5)) }
+    }, modifier = Modifier.fillMaxWidth().height(AppDimens.fieldHeight)) {
+      Text(value.take(5), modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+      Icon(Icons.Default.Schedule, null, modifier = Modifier.size(18.dp))
+    }
   }
 }
 
 @Composable
 fun FormSection(title: String, content: @Composable () -> Unit) {
-  Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-    content()
+  GlassPanel {
+    Column(Modifier.padding(AppDimens.cardInset),
+      verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+      Text(title, style = MaterialTheme.typography.titleMedium)
+      content()
+    }
   }
 }
