@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import top.zwtx.daysmatter.data.ApiException
+import top.zwtx.daysmatter.data.AppearanceMode
 import top.zwtx.daysmatter.data.AppRepository
 import top.zwtx.daysmatter.data.LocalReminder
 import top.zwtx.daysmatter.data.LocalStore
@@ -38,6 +39,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private set
   var gridMode by mutableStateOf(store.gridMode())
     private set
+  var appearanceMode by mutableStateOf(store.appearanceMode())
+    private set
 
   init {
     if (session != null) refresh()
@@ -48,6 +51,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
   fun updateGridMode(enabled: Boolean) {
     gridMode = enabled
     store.setGridMode(enabled)
+  }
+
+  fun updateAppearanceMode(mode: AppearanceMode) {
+    appearanceMode = mode
+    store.setAppearanceMode(mode)
   }
 
   private fun report(error: Exception, requestedSession: Session? = null) {

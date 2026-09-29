@@ -11,6 +11,8 @@ import javax.crypto.spec.GCMParameterSpec
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 
+enum class AppearanceMode { SYSTEM, LIGHT, DARK }
+
 class LocalStore(private val context: Context) {
   private val preferences = context.getSharedPreferences("days_matter", Context.MODE_PRIVATE)
   private val keyAlias = "days_matter_session_v1"
@@ -70,6 +72,14 @@ class LocalStore(private val context: Context) {
 
   fun setGridMode(enabled: Boolean) {
     preferences.edit().putBoolean("grid_mode", enabled).apply()
+  }
+
+  fun appearanceMode(): AppearanceMode =
+    AppearanceMode.entries.firstOrNull { it.name == preferences.getString("appearance_mode", null) }
+      ?: AppearanceMode.SYSTEM
+
+  fun setAppearanceMode(mode: AppearanceMode) {
+    preferences.edit().putString("appearance_mode", mode.name).apply()
   }
 
   private fun remindersKey(userId: Int) = "reminders_$userId"

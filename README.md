@@ -8,13 +8,15 @@ Kotlin + Jetpack Compose Android client for the existing Days Matter Cloudflare 
 - Event list and detail, pull-to-refresh, category drawer filters, grid/list layout, pinning, repeat rules, and sub-events
 - Solar and lunar date entry, using the same `lunar-java` family as the Worker’s lunar library
 - Category color/icon management and the existing 83 category icon identifiers
-- Webhook channels, profile editing, system-following dark mode, JSON import and export
+- Webhook channels, profile editing, a default avatar, persistent light/dark/system appearance modes, JSON import and export
 - Device-local reminders, separate from Webhook channels; the next occurrence is scheduled using the Worker’s Asia/Shanghai date result
 - Cached event data for offline reading; changes require a network connection, and syncing resumes when connectivity returns or the user pulls down to refresh
 
 ## Design language
 
-The interface treats dates as a quiet journal: warm neutral surfaces, slate text and actions, and one dark summary card for the next event. Page gutters are 20 dp, card insets 18 dp, item gaps 12 dp, and section gaps 20 dp. The drawer combines a 12 dp outer inset with an 8 dp inner inset to keep the same alignment. Form fields are 56 dp high and action buttons are 48 dp high. Frosted blur is reserved for the floating navigation; content panels use solid surfaces and fine borders for readability. The shared values live in `ui/Theme.kt`.
+The interface uses airy blue-white surfaces, a clear blue primary action, restrained coral accents, and a blue-to-teal summary card for the next event. Page gutters are 20 dp, card insets 18 dp, item gaps 12 dp, and section gaps 20 dp. The drawer combines a 12 dp outer inset with an 8 dp inner inset to keep the same alignment. Form fields are 56 dp high and action buttons are 48 dp high. Text, selection, date, and time fields share the same outline shape and full-width alignment; required labels use a red asterisk. Frosted blur is reserved for the floating navigation; content panels use solid surfaces and fine borders for readability. The shared values live in `ui/Theme.kt`.
+
+Information follows the reading task: list cards show the event name, days, and a short next date; detail leads with the days and next occurrence, then groups origin, repeat rules, and reminders below. Detail editing and deletion share a floating action bar with the same glass treatment as the main navigation.
 
 ## Build
 

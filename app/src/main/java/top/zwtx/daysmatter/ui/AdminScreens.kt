@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import top.zwtx.daysmatter.MainViewModel
 import org.json.JSONObject
@@ -68,7 +69,8 @@ fun CategoryListScreen(
           Row(Modifier.padding(AppDimens.drawerCardInset), verticalAlignment = Alignment.CenterVertically) {
             CategoryIcon(category.icon, category.color)
             Spacer(Modifier.width(12.dp))
-            Text(category.name, modifier = Modifier.weight(1f))
+            Text(category.name, modifier = Modifier.weight(1f), maxLines = 1,
+              overflow = TextOverflow.Ellipsis)
             IconButton(onClick = { onEdit(category.id) }) { Icon(Icons.Default.Edit, "编辑分类") }
             IconButton(onClick = { deleteId = category.id }) { Icon(Icons.Default.Delete, "删除分类") }
           }
@@ -106,7 +108,8 @@ fun CategoryEditorScreen(vm: MainViewModel, categoryId: Int?, onSaved: () -> Uni
       .padding(AppDimens.drawerInnerGutter),
     verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
   ) {
-    OutlinedTextField(name, { name = it }, label = { Text("分类名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(name, { name = it }, label = { FormFieldLabel("分类名称", required = true) },
+      singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
     Text("颜色", style = MaterialTheme.typography.titleMedium)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       colors.forEach { option ->
@@ -122,7 +125,8 @@ fun CategoryEditorScreen(vm: MainViewModel, categoryId: Int?, onSaved: () -> Uni
       }
     }
     Text("图标", style = MaterialTheme.typography.titleMedium)
-    OutlinedTextField(search, { search = it }, label = { Text("搜索图标，例如：生日、旅行、heart") }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(search, { search = it }, label = { Text("搜索图标，例如：生日、旅行、heart") },
+      shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
     LazyVerticalGrid(
       columns = GridCells.Adaptive(AppDimens.controlHeight), modifier = Modifier.fillMaxWidth().height(240.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -130,7 +134,8 @@ fun CategoryEditorScreen(vm: MainViewModel, categoryId: Int?, onSaved: () -> Uni
       gridItems(icons) { id ->
         FilterChip(
           selected = icon == id, onClick = { icon = id },
-          label = { Icon(painterResource(CategoryIconResources.drawable(id)), id, tint = categoryColor(color)) }
+          label = { Icon(painterResource(CategoryIconResources.drawable(id)), id, tint = categoryColor(color)) },
+          modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)
         )
       }
     }
@@ -169,13 +174,20 @@ fun ChannelListScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Int) -> Uni
   val channels = vm.snapshot?.channels.orEmpty()
   var deleteId by remember { mutableStateOf<Int?>(null) }
   Column(Modifier.fillMaxSize().padding(contentPadding)) {
-    Row(Modifier.fillMaxWidth().padding(AppDimens.pageGutter), verticalAlignment = Alignment.CenterVertically) {
-      Text("Webhook 提醒", modifier = Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth().padding(horizontal = AppDimens.pageGutter, vertical = AppDimens.itemGap),
+      verticalAlignment = Alignment.CenterVertically) {
+      Column(Modifier.weight(1f)) {
+        Text("提醒渠道", style = MaterialTheme.typography.titleMedium)
+        Text("共 ${channels.size} 个 Webhook 渠道", style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant)
+      }
       TextButton(onClick = onAdd) { Text("添加渠道") }
     }
-    if (channels.isEmpty()) Text("还没有 Webhook 渠道", modifier = Modifier.padding(AppDimens.pageGutter))
+    if (channels.isEmpty()) Text("还没有 Webhook 渠道，点击右上角添加",
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(horizontal = AppDimens.pageGutter, vertical = AppDimens.sectionGap))
     LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap),
-      contentPadding = PaddingValues(AppDimens.pageGutter)) {
+      contentPadding = PaddingValues(horizontal = AppDimens.pageGutter, vertical = 4.dp)) {
       items(channels, key = { it.id }) { channel ->
         GlassPanel {
           Row(Modifier.padding(AppDimens.cardInset), verticalAlignment = Alignment.CenterVertically) {
@@ -223,17 +235,19 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
     verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
   ) {
     FormSection("渠道信息") {
-      OutlinedTextField(name, { name = it }, label = { Text("渠道名称") }, modifier = Modifier.fillMaxWidth())
-      OutlinedTextField(account, { account = it }, label = { Text("Webhook HTTPS 地址") }, modifier = Modifier.fillMaxWidth())
+      OutlinedTextField(name, { name = it }, label = { FormFieldLabel("渠道名称", required = true) },
+        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+      OutlinedTextField(account, { account = it }, label = { FormFieldLabel("Webhook HTTPS 地址", required = true) },
+        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
       SelectionField("消息格式", format, formats, { format = it })
       OutlinedTextField(
         token, { token = it }, label = { Text(if (existing?.hasAuthToken == true) "Token（留空保持原值）" else "Token（可选）") },
-        modifier = Modifier.fillMaxWidth()
+        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
       )
       if (format == "custom") {
         OutlinedTextField(
           template, { template = it }, label = { Text("自定义 JSON 模板") },
-          minLines = 5, modifier = Modifier.fillMaxWidth()
+          minLines = 5, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
         )
         Text("支持 {{event_name}}、{{target_date}}、{{days}} 等占位符", style = MaterialTheme.typography.bodySmall)
       }

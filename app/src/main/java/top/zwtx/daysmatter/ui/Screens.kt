@@ -1,6 +1,7 @@
 package top.zwtx.daysmatter.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -25,9 +27,9 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,13 +55,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.zwtx.daysmatter.MainViewModel
+import top.zwtx.daysmatter.R
 import top.zwtx.daysmatter.data.Event
+import top.zwtx.daysmatter.data.AppearanceMode
 import top.zwtx.daysmatter.data.Snapshot
 import org.json.JSONObject
 import java.time.LocalDate
@@ -96,17 +103,21 @@ fun AuthScreen(vm: MainViewModel, modifier: Modifier, contentPadding: PaddingVal
           FilterChip(selected = register, onClick = { register = true }, label = { Text("注册") })
         }
         if (register) {
-          OutlinedTextField(name, { name = it }, label = { Text("昵称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+          OutlinedTextField(name, { name = it }, label = { FormFieldLabel("昵称", required = true) },
+            singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
         }
-        OutlinedTextField(email, { email = it }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(email, { email = it }, label = { FormFieldLabel("邮箱", required = true) },
+          singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(
-          password, { password = it }, label = { Text("密码") }, singleLine = true,
-          visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth()
+          password, { password = it }, label = { FormFieldLabel("密码", required = true) }, singleLine = true,
+          visualTransformation = PasswordVisualTransformation(), shape = MaterialTheme.shapes.medium,
+          modifier = Modifier.fillMaxWidth()
         )
         if (register) {
           OutlinedTextField(
-            confirm, { confirm = it }, label = { Text("确认密码") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth()
+            confirm, { confirm = it }, label = { FormFieldLabel("确认密码", required = true) }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(), shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth()
           )
         }
         Button(onClick = {
@@ -218,32 +229,39 @@ private fun HomeEmptyState(message: String) {
 private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modifier: Modifier = Modifier) {
   val events = snapshot?.events.orEmpty()
   val next = events.filter { (it.daysDiff ?: -1) >= 0 }.minByOrNull { it.daysDiff ?: Int.MAX_VALUE }
-  val today = events.count { it.daysDiff == 0 }
+  val featured = next ?: events.filter { (it.daysDiff ?: 0) < 0 }.maxByOrNull { it.daysDiff ?: Int.MIN_VALUE }
   val upcoming = events.count { (it.daysDiff ?: -1) > 0 }
-  val date = LocalDate.now(ZoneId.of("Asia/Shanghai"))
-    .format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA))
+  val date = featured?.let {
+    "${if ((it.daysDiff ?: 0) < 0) "最近经过" else "下一次"} · ${readableDate(it.nextOccurrence ?: it.targetDate)}"
+  }
+    ?: LocalDate.now(ZoneId.of("Asia/Shanghai"))
+      .format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA))
   val shape = MaterialTheme.shapes.large
   Box(modifier.fillMaxWidth().clip(shape)
-    .background(Brush.linearGradient(listOf(Color(0xFF2B394E), Color(0xFF425774))))
-    .border(1.dp, Color.White.copy(alpha = 0.16f), shape)
-    .then(if (next == null) Modifier else Modifier.clickable { onEventClick(next.id) })) {
+    .background(Brush.linearGradient(listOf(Color(0xFF245FC0), Color(0xFF08797D))))
+    .border(1.dp, Color.White.copy(alpha = 0.24f), shape)
+    .then(if (featured == null) Modifier else Modifier.clickable { onEventClick(featured.id) })) {
     Column(Modifier.fillMaxWidth().padding(AppDimens.pageGutter)) {
-      Text(date, color = Color.White.copy(alpha = 0.78f), style = MaterialTheme.typography.labelMedium)
+      Text(date, color = Color.White.copy(alpha = 0.94f), style = MaterialTheme.typography.labelMedium)
       Spacer(Modifier.height(14.dp))
-      if (next != null) {
+      if (featured != null) {
+        val days = featured.daysDiff ?: 0
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-          Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("下一个日子", color = Color.White.copy(alpha = 0.72f),
-              style = MaterialTheme.typography.labelSmall)
-            Text(next.name, color = Color.White, style = MaterialTheme.typography.titleLarge,
+          Column(Modifier.weight(1f)) {
+            Text(featured.name, color = Color.White, style = MaterialTheme.typography.titleLarge,
               maxLines = 2, overflow = TextOverflow.Ellipsis)
           }
           Column(horizontalAlignment = Alignment.End) {
-            Text(if (next.daysDiff == 0) "今天" else "${next.daysDiff}", color = Color.White,
-              fontSize = if (next.daysDiff == 0) 28.sp else 42.sp,
+            Text(when {
+              days == 0 -> "今天"
+              days < 0 -> "${-days.toLong()}"
+              else -> "$days"
+            }, color = Color.White,
+              fontSize = if (days == 0) 28.sp else 42.sp,
               lineHeight = 46.sp, fontWeight = FontWeight.SemiBold)
-            if (next.daysDiff != 0) Text("天后", color = Color.White.copy(alpha = 0.82f),
+            if (days != 0) Text(if (days < 0) "天前" else "天后",
+              color = Color.White.copy(alpha = 0.94f),
               style = MaterialTheme.typography.labelMedium)
           }
         }
@@ -252,11 +270,11 @@ private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modif
           style = MaterialTheme.typography.titleLarge)
       }
       Spacer(Modifier.height(AppDimens.sectionGap))
-      HorizontalDivider(color = Color.White.copy(alpha = 0.22f))
+      HorizontalDivider(color = Color.White.copy(alpha = 0.34f))
       Spacer(Modifier.height(12.dp))
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        OverviewStat("$today", "今天到期", Modifier.weight(1f))
-        Box(Modifier.width(1.dp).height(22.dp).background(Color.White.copy(alpha = 0.2f)))
+        OverviewStat("${events.size}", "全部记录", Modifier.weight(1f))
+        Box(Modifier.width(1.dp).height(22.dp).background(Color.White.copy(alpha = 0.34f)))
         OverviewStat("$upcoming", "即将到来", Modifier.weight(1f))
       }
     }
@@ -270,21 +288,28 @@ private fun OverviewStat(value: String, label: String, modifier: Modifier = Modi
     horizontalArrangement = Arrangement.Center) {
     Text(value, color = Color.White, style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.width(7.dp))
-    Text(label, color = Color.White.copy(alpha = 0.86f), style = MaterialTheme.typography.bodySmall)
+    Text(label, color = Color.White.copy(alpha = 0.94f), style = MaterialTheme.typography.bodySmall)
   }
 }
 
 @Composable
 private fun EventCard(event: Event, grid: Boolean, onClick: () -> Unit) {
   val nextDate = event.nextOccurrence ?: event.targetDate
-  val dateLabel = if (event.dateType == 1) "$nextDate · ${lunarLabel(nextDate) ?: "农历"}" else nextDate
-  val count = event.daysDiff?.let { if (it < 0) "${-it}" else "$it" } ?: "—"
+  val dateLabel = compactDate(nextDate)
+  val count = when {
+    event.daysDiff == null -> "—"
+    event.daysDiff == 0 -> "今天"
+    event.daysDiff < 0 -> "${-event.daysDiff.toLong()}"
+    else -> "${event.daysDiff}"
+  }
   val suffix = when {
     event.daysDiff == null -> "待同步"
-    event.daysDiff == 0 -> "今天"
+    event.daysDiff == 0 -> ""
     event.daysDiff > 0 -> "天后"
     else -> "天前"
   }
+  val countStyle = if (event.daysDiff == 0) MaterialTheme.typography.titleLarge
+    else MaterialTheme.typography.headlineMedium
   GlassPanel(onClick = onClick) {
     if (grid) {
       Column(Modifier.padding(AppDimens.cardInset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -297,11 +322,11 @@ private fun EventCard(event: Event, grid: Boolean, onClick: () -> Unit) {
         Text(event.name, style = MaterialTheme.typography.titleMedium, maxLines = 2,
           overflow = TextOverflow.Ellipsis, minLines = 2)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-          Text(count, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-          Text(suffix, style = MaterialTheme.typography.labelSmall,
+          Text(count, style = countStyle, color = MaterialTheme.colorScheme.primary)
+          if (suffix.isNotEmpty()) Text(suffix, style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
         }
-        Text(dateLabel, style = MaterialTheme.typography.bodySmall,
+        Text("${if (event.repeatType == 0) "目标" else "下次"} $dateLabel", style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
     } else {
@@ -316,8 +341,8 @@ private fun EventCard(event: Event, grid: Boolean, onClick: () -> Unit) {
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Column(horizontalAlignment = Alignment.End) {
-          Text(count, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-          Text(suffix, style = MaterialTheme.typography.labelSmall,
+          Text(count, style = countStyle, color = MaterialTheme.colorScheme.primary)
+          if (suffix.isNotEmpty()) Text(suffix, style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
       }
@@ -336,97 +361,192 @@ private fun EventIcon(event: Event) {
 
 @Composable
 fun EventDetailScreen(
-  vm: MainViewModel, eventId: Int, onEdit: () -> Unit, onDeleted: () -> Unit,
+  vm: MainViewModel, eventId: Int,
   onAddSub: () -> Unit, onEditSub: (Int) -> Unit, contentPadding: PaddingValues
 ) {
   val event = vm.snapshot?.events?.find { it.id == eventId }
-  var confirmDelete by remember(eventId) { mutableStateOf(false) }
   var subToDelete by remember(eventId) { mutableStateOf<Int?>(null) }
   if (event == null) {
     EmptyState("未找到事件，请同步后重试")
     return
   }
+  val nextDate = event.nextOccurrence ?: event.targetDate
+  val localReminder = vm.localReminder(event.id)
+  val countdown = when {
+    event.daysDiff == null -> "—"
+    event.daysDiff == 0 -> "今天"
+    event.daysDiff < 0 -> (-event.daysDiff.toLong()).toString()
+    else -> event.daysDiff.toString()
+  }
+  val countdownUnit = when {
+    event.daysDiff == null -> "日期待同步"
+    event.daysDiff == 0 -> ""
+    event.daysDiff > 0 -> "天后"
+    else -> "天前"
+  }
+  val countdownColor = if ((event.daysDiff ?: 0) < 0) MaterialTheme.colorScheme.onSurfaceVariant
+    else MaterialTheme.colorScheme.primary
   Column(
     Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
       .padding(AppDimens.pageGutter),
     verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
   ) {
-    GlassPanel {
-      Column(Modifier.padding(AppDimens.cardInset),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)
+      .background(MaterialTheme.colorScheme.primaryContainer)) {
+      Column(Modifier.padding(24.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           EventIcon(event)
-          Spacer(Modifier.width(10.dp))
-          Text(event.categoryName, style = MaterialTheme.typography.labelLarge)
+          Text(event.categoryName, style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
-        Text(event.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(daysLabel(event.daysDiff), style = MaterialTheme.typography.headlineLarge,
-          color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(18.dp))
+        Text(event.name, style = MaterialTheme.typography.headlineMedium,
+          color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Spacer(Modifier.height(18.dp))
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text(countdown, fontSize = if (event.daysDiff == 0) 42.sp else 64.sp,
+            lineHeight = 68.sp, fontWeight = FontWeight.Bold,
+            color = countdownColor)
+          if (countdownUnit.isNotEmpty()) Text(countdownUnit, style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.padding(bottom = 9.dp))
+        }
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f))
+        Spacer(Modifier.height(14.dp))
+        Text(if (event.repeatType == 0) "目标日期" else "下一次日期",
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f))
+        Text(if (event.repeatType != 0 && event.nextOccurrence == null) "等待同步"
+          else readableDate(nextDate), style = MaterialTheme.typography.titleMedium,
+          color = MaterialTheme.colorScheme.onPrimaryContainer)
+        if (event.dateType == 1 && (event.repeatType == 0 || event.nextOccurrence != null)) lunarLabel(nextDate)?.let {
+          Text(it, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f))
+        }
+      }
+    }
+
+    if (event.repeatType != 0) {
+      DetailSection("日期与规则") {
+        DetailInfo("原始日期", readableDate(event.targetDate),
+          if (event.dateType == 1) lunarLabel(event.targetDate) else null)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Text(
-          "目标日期：${event.targetDate}" +
-            if (event.dateType == 1) " · ${lunarLabel(event.targetDate) ?: "农历"}" else "",
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        event.nextOccurrence?.let {
-          Text("下一次：$it" + if (event.dateType == 1) " · ${lunarLabel(it) ?: "农历"}" else "",
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (event.repeatType != 0) {
-          val labels = listOf("不重复", "天", "周", "月", "年")
-          Text("每 ${event.repeatValue} ${labels.getOrElse(event.repeatType) { "" }}重复")
-        }
+        val units = listOf("", "天", "周", "月", "年")
+        DetailInfo("重复规则", "每 ${event.repeatValue} ${units.getOrElse(event.repeatType) { "" }}")
+      }
+    }
+
+    if (event.webhookEnabled || localReminder.enabled) {
+      DetailSection("提醒") {
         if (event.webhookEnabled) {
-          val name = vm.snapshot?.channels?.find { it.id == event.channelId }?.name ?: "Webhook"
-          Text("Webhook：$name · 提前 ${event.advanceDays} 天 ${event.remindTime.take(5)}")
+          val channelName = vm.snapshot?.channels?.find { it.id == event.channelId }?.name ?: "Webhook 渠道"
+          DetailInfo("站外提醒 · $channelName", "${reminderOffset(event.advanceDays)} · ${event.remindTime.take(5)}")
         }
-        val local = vm.localReminder(event.id)
-        if (local.enabled) Text("手机提醒：提前 ${local.advanceDays} 天 ${local.time}（北京时间）")
+        if (event.webhookEnabled && localReminder.enabled) {
+          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+        if (localReminder.enabled) {
+          DetailInfo("本机通知", "${reminderOffset(localReminder.advanceDays)} · ${localReminder.time}")
+        }
       }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-      OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f).height(AppDimens.controlHeight)) {
-        Icon(Icons.Default.Edit, null)
-        Spacer(Modifier.width(6.dp))
-        Text("编辑")
+
+    Column(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("子事件", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        TextButton(onClick = onAddSub, modifier = Modifier.height(40.dp)) {
+          Icon(painterResource(R.drawable.ic_action_add), null, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(6.dp))
+          Text("添加子事件", style = MaterialTheme.typography.labelLarge)
+        }
       }
-      OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.weight(1f).height(AppDimens.controlHeight)) {
-        Icon(Icons.Default.Delete, null)
-        Spacer(Modifier.width(6.dp))
-        Text("删除")
-      }
-    }
-    HorizontalDivider()
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("子事件", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-      TextButton(onClick = onAddSub) { Text("添加") }
-    }
-    if (event.subEvents.isEmpty()) Text("还没有子事件")
-    event.subEvents.forEach { sub ->
-      GlassPanel {
-        Row(Modifier.padding(AppDimens.cardInset), verticalAlignment = Alignment.CenterVertically) {
-          Column(Modifier.weight(1f)) {
-            Text(sub.name, style = MaterialTheme.typography.titleSmall)
-            val lunar = if (sub.dateType == 1) " · ${lunarLabel(sub.targetDate) ?: "农历"}" else ""
-            Text("${sub.targetDate}$lunar · ${daysLabel(sub.daysDiff)}", style = MaterialTheme.typography.bodySmall)
+      if (event.subEvents.isEmpty()) {
+        GlassPanel {
+          Row(Modifier.fillMaxWidth().padding(AppDimens.cardInset),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+            Box(Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
+              .background(MaterialTheme.colorScheme.primaryContainer),
+              contentAlignment = Alignment.Center) {
+              Icon(Icons.AutoMirrored.Filled.EventNote, null, modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.primary)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+              Text("还没有子事件", style = MaterialTheme.typography.titleSmall)
+              Text("添加一个小节点，让这个日子更完整",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
           }
-          IconButton(onClick = { onEditSub(sub.id) }) { Icon(Icons.Default.Edit, "编辑子事件") }
-          IconButton(onClick = { subToDelete = sub.id }) { Icon(Icons.Default.Delete, "删除子事件") }
+        }
+      }
+      event.subEvents.forEach { sub ->
+        GlassPanel {
+          Row(Modifier.padding(AppDimens.cardInset), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+              Text(sub.name, style = MaterialTheme.typography.titleMedium)
+              val subDate = sub.nextOccurrence ?: sub.targetDate
+              val lunar = if (sub.dateType == 1) lunarLabel(subDate) else null
+              Text("${readableDate(subDate)} · ${daysLabel(sub.daysDiff)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+              if (lunar != null) Text(lunar, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = { onEditSub(sub.id) }, modifier = Modifier.size(AppDimens.controlHeight)) {
+              Icon(painterResource(R.drawable.ic_action_edit), "编辑子事件", modifier = Modifier.size(18.dp))
+            }
+            IconButton(onClick = { subToDelete = sub.id }, modifier = Modifier.size(AppDimens.controlHeight)) {
+              Icon(painterResource(R.drawable.ic_action_delete), "删除子事件", modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.error)
+            }
+          }
         }
       }
     }
-  }
-  if (confirmDelete) {
-    ConfirmDeleteDialog("删除倒数日", "此事件及其子事件将被删除。", onDismiss = { confirmDelete = false }) {
-      confirmDelete = false
-      vm.write("DELETE", "/events/$eventId", onDone = onDeleted)
-    }
+    Spacer(Modifier.height(floatingTabContentClearance()))
   }
   subToDelete?.let { id ->
     ConfirmDeleteDialog("删除子事件", "确认删除这个子事件？", onDismiss = { subToDelete = null }) {
       subToDelete = null
       vm.write("DELETE", "/sub-events/$id")
     }
+  }
+}
+
+private fun readableDate(value: String): String = runCatching {
+  LocalDate.parse(value).format(DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA))
+}.getOrDefault(value)
+
+private fun compactDate(value: String): String = runCatching {
+  val date = LocalDate.parse(value)
+  val pattern = if (date.year == LocalDate.now(ZoneId.of("Asia/Shanghai")).year) "M月d日" else "yyyy年M月d日"
+  date.format(DateTimeFormatter.ofPattern(pattern, Locale.CHINA))
+}.getOrDefault(value)
+
+private fun reminderOffset(days: Int): String = if (days == 0) "当天" else "提前 $days 天"
+
+@Composable
+private fun DetailSection(title: String, content: @Composable () -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+    Text(title, style = MaterialTheme.typography.titleMedium)
+    GlassPanel {
+      Column(Modifier.padding(AppDimens.cardInset),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) { content() }
+    }
+  }
+}
+
+@Composable
+private fun DetailInfo(label: String, value: String, note: String? = null) {
+  Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Text(label, style = MaterialTheme.typography.labelMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(value, style = MaterialTheme.typography.titleMedium)
+    if (note != null) Text(note, style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant)
   }
 }
 
@@ -447,10 +567,16 @@ fun ProfileScreen(
 ) {
   val profile = vm.snapshot?.profile
   var editing by remember { mutableStateOf(false) }
+  var choosingAppearance by remember { mutableStateOf(false) }
   var nickname by remember(profile?.nickname) { mutableStateOf(profile?.nickname.orEmpty()) }
   var email by remember(profile?.email) { mutableStateOf(profile?.email.orEmpty()) }
   val displayName = profile?.nickname?.ifBlank { vm.session?.name.orEmpty() } ?: vm.session?.name.orEmpty()
   val displayEmail = profile?.email ?: vm.session?.email.orEmpty()
+  val appearanceLabel = when (vm.appearanceMode) {
+    AppearanceMode.LIGHT -> "浅色模式"
+    AppearanceMode.DARK -> "深色模式"
+    AppearanceMode.SYSTEM -> "跟随系统"
+  }
   val syncStatus = when {
     vm.offline -> "离线阅读中 · 等待同步"
     vm.busy -> "正在同步"
@@ -470,10 +596,12 @@ fun ProfileScreen(
       Column(Modifier.padding(AppDimens.cardInset)) {
         Row(verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-          Box(Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-            Text(displayName.take(1).ifBlank { "日" }, style = MaterialTheme.typography.titleMedium,
-              color = MaterialTheme.colorScheme.onPrimaryContainer)
+          Box(Modifier.size(54.dp).clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+            contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Person, "默认头像", modifier = Modifier.size(28.dp),
+              tint = MaterialTheme.colorScheme.primary)
           }
           Column(Modifier.weight(1f)) {
             Text(displayName, style = MaterialTheme.typography.titleMedium)
@@ -499,11 +627,7 @@ fun ProfileScreen(
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("导入数据", "从 JSON 备份追加数据", onImport)
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          Column(Modifier.padding(horizontal = AppDimens.cardInset, vertical = 14.dp)) {
-            Text("外观", style = MaterialTheme.typography.titleMedium)
-            Text("自动跟随系统深色模式", style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant)
-          }
+          SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
         }
       }
     }
@@ -518,8 +642,10 @@ fun ProfileScreen(
       title = { Text("编辑资料") },
       text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedTextField(nickname, { nickname = it }, label = { Text("昵称") })
-          OutlinedTextField(email, { email = it }, label = { Text("邮箱") })
+          OutlinedTextField(nickname, { nickname = it }, label = { FormFieldLabel("昵称", required = true) },
+            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+          OutlinedTextField(email, { email = it }, label = { FormFieldLabel("邮箱", required = true) },
+            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
         }
       },
       confirmButton = {
@@ -533,6 +659,36 @@ fun ProfileScreen(
         }) { Text("保存") }
       },
       dismissButton = { TextButton(onClick = { editing = false }) { Text("取消") } }
+    )
+  }
+  if (choosingAppearance) {
+    AlertDialog(
+      onDismissRequest = { choosingAppearance = false },
+      title = { Text("外观") },
+      text = {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          listOf(
+            Triple(AppearanceMode.LIGHT, "浅色模式", "始终使用浅色外观"),
+            Triple(AppearanceMode.DARK, "深色模式", "始终使用深色外观"),
+            Triple(AppearanceMode.SYSTEM, "跟随系统", "随设备设置自动切换")
+          ).forEach { (mode, title, description) ->
+            Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+              .selectable(selected = vm.appearanceMode == mode, role = Role.RadioButton) {
+                vm.updateAppearanceMode(mode)
+                choosingAppearance = false
+              }.padding(horizontal = 8.dp, vertical = 8.dp),
+              verticalAlignment = Alignment.CenterVertically) {
+              RadioButton(selected = vm.appearanceMode == mode, onClick = null)
+              Column(Modifier.padding(start = 8.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(description, style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+            }
+          }
+        }
+      },
+      confirmButton = { TextButton(onClick = { choosingAppearance = false }) { Text("取消") } }
     )
   }
 }

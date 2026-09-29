@@ -2,7 +2,9 @@ package top.zwtx.daysmatter.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -12,6 +14,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nlf.calendar.Lunar
 import com.nlf.calendar.LunarMonth
@@ -54,7 +57,8 @@ fun LunarPickerDialog(initialSolarDate: String, onDismiss: () -> Unit, onSelect:
     title = { Text("选择农历日期") },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(yearText, { yearText = it }, label = { Text("农历年份（1900–2100）") }, singleLine = true)
+        OutlinedTextField(yearText, { yearText = it }, label = { FormFieldLabel("农历年份（1900–2100）", required = true) },
+          singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
         SelectionField("月份", selectedMonth.toString(), months.map {
           it.toString() to if (it < 0) "闰${-it}月" else "${it}月"
         }, { month = it.toInt() })

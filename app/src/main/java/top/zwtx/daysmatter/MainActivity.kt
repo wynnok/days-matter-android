@@ -28,8 +28,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -41,7 +41,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -49,13 +50,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import top.zwtx.daysmatter.data.AppearanceMode
 import top.zwtx.daysmatter.ui.AuthScreen
 import top.zwtx.daysmatter.ui.CategoryDrawer
 import top.zwtx.daysmatter.ui.ChannelEditorScreen
 import top.zwtx.daysmatter.ui.ChannelListScreen
+import top.zwtx.daysmatter.ui.ConfirmDeleteDialog
 import top.zwtx.daysmatter.ui.DaysMatterTheme
 import top.zwtx.daysmatter.ui.EventDetailScreen
 import top.zwtx.daysmatter.ui.EventEditorScreen
+import top.zwtx.daysmatter.ui.FloatingDetailActions
 import top.zwtx.daysmatter.ui.FloatingTabBar
 import top.zwtx.daysmatter.ui.FloatingTabBottomGap
 import top.zwtx.daysmatter.ui.floatingTabContentClearance
@@ -81,12 +85,22 @@ class MainActivity : ComponentActivity() {
     setContent {
       val vm: MainViewModel = viewModel()
       appViewModel = vm
-      val dark = isSystemInDarkTheme()
-      SideEffect {
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !dark
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = !dark
+      val systemDark = isSystemInDarkTheme()
+      val dark = when (vm.appearanceMode) {
+        AppearanceMode.LIGHT -> false
+        AppearanceMode.DARK -> true
+        AppearanceMode.SYSTEM -> systemDark
       }
-      DaysMatterTheme(dark) { DaysMatterApp(vm) }
+      DaysMatterTheme(dark) {
+        val systemBarColor = MaterialTheme.colorScheme.background.toArgb()
+        SideEffect {
+          window.statusBarColor = systemBarColor
+          window.navigationBarColor = systemBarColor
+          WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !dark
+          WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = !dark
+        }
+        DaysMatterApp(vm)
+      }
     }
   }
 
@@ -109,11 +123,13 @@ private fun DaysMatterApp(vm: MainViewModel) {
   var eventId by rememberSaveable { mutableIntStateOf(0) }
   var channelId by rememberSaveable { mutableIntStateOf(0) }
   var subEventId by rememberSaveable { mutableIntStateOf(0) }
+  var confirmDeleteEvent by remember { mutableStateOf(false) }
   var categoryFilter by rememberSaveable { mutableIntStateOf(0) }
   var exportText by remember { mutableStateOf<String?>(null) }
   val snackbar = remember { SnackbarHostState() }
   val hazeState = remember { HazeState() }
   val drawerState = rememberDrawerState(DrawerValue.Closed)
+  val drawerMotion = remember { spring<Float>(dampingRatio = 0.84f, stiffness = Spring.StiffnessMediumLow) }
   val scope = rememberCoroutineScope()
   val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -159,16 +175,19 @@ private fun DaysMatterApp(vm: MainViewModel) {
   }
 
   LaunchedEffect(page, vm.session?.userId) {
-    if (page != "home") drawerState.close()
+    if (page != "home") drawerState.animateTo(DrawerValue.Closed, drawerMotion)
   }
   LaunchedEffect(vm.snapshot?.categories, categoryFilter) {
     if (categoryFilter != 0 && vm.snapshot != null &&
       vm.snapshot?.categories?.none { it.id == categoryFilter } == true) categoryFilter = 0
   }
-  val drawerContentAlpha by animateFloatAsState(
-    if (drawerState.targetValue == DrawerValue.Open) 1f else 0.86f,
-    animationSpec = tween(260), label = "drawerContentAlpha"
-  )
+  val drawerWidthPx = with(LocalDensity.current) { 300.dp.toPx() }
+  val drawerOffset = drawerState.currentOffset
+  val drawerProgress = if (drawerOffset.isNaN()) {
+    if (drawerState.targetValue == DrawerValue.Open) 1f else 0f
+  } else {
+    (1f + drawerOffset / drawerWidthPx).coerceIn(0f, 1f)
+  }
 
   val back: () -> Unit = {
     page = when (page) {
@@ -180,7 +199,9 @@ private fun DaysMatterApp(vm: MainViewModel) {
       else -> "home"
     }
   }
-  BackHandler(drawerState.isOpen) { scope.launch { drawerState.close() } }
+  BackHandler(drawerProgress > 0.01f) {
+    scope.launch { drawerState.animateTo(DrawerValue.Closed, drawerMotion) }
+  }
   BackHandler(page != "home" && page != "profile") { back() }
 
   val title = when (page) {
@@ -197,18 +218,18 @@ private fun DaysMatterApp(vm: MainViewModel) {
   ModalNavigationDrawer(
     drawerState = drawerState,
     gesturesEnabled = page == "home",
-    scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f),
+    scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.28f),
     drawerContent = {
       CategoryDrawer(
         vm = vm,
         selectedCategoryId = categoryFilter,
         onSelect = { id ->
           categoryFilter = id
-          scope.launch { drawerState.close() }
+          scope.launch { drawerState.animateTo(DrawerValue.Closed, drawerMotion) }
         },
-        onClose = { scope.launch { drawerState.close() } },
+        onClose = { scope.launch { drawerState.animateTo(DrawerValue.Closed, drawerMotion) } },
         isOpen = drawerState.isOpen,
-        modifier = Modifier.graphicsLayer { alpha = drawerContentAlpha }
+        progress = drawerProgress
       )
     }
   ) {
@@ -218,7 +239,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
         when (page) {
           "home" -> HomeTopBar(
             grid = vm.gridMode,
-            onOpenCategories = { scope.launch { drawerState.open() } },
+            onOpenCategories = { scope.launch { drawerState.animateTo(DrawerValue.Open, drawerMotion) } },
             onGridChange = { vm.updateGridMode(!vm.gridMode) }
           )
           "profile" -> Unit
@@ -234,7 +255,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
         }
       },
       snackbarHost = {
-        SnackbarHost(snackbar, modifier = Modifier.padding(bottom = if (page in setOf("home", "profile")) floatingTabContentClearance() else 0.dp))
+        SnackbarHost(snackbar, modifier = Modifier.padding(bottom = if (page in setOf("home", "profile", "event_detail")) floatingTabContentClearance() else 0.dp))
       }
     ) { padding ->
       val screenPadding = PaddingValues(0.dp)
@@ -263,8 +284,6 @@ private fun DaysMatterApp(vm: MainViewModel) {
             )
             "event_detail" -> EventDetailScreen(
               vm, eventId,
-              onEdit = { page = "event_form" },
-              onDeleted = { page = "home" },
               onAddSub = { subEventId = 0; page = "sub_form" },
               onEditSub = { subEventId = it; page = "sub_form" },
               contentPadding = screenPadding
@@ -297,7 +316,22 @@ private fun DaysMatterApp(vm: MainViewModel) {
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = FloatingTabBottomGap)
           )
         }
+        if (page == "event_detail" && vm.snapshot?.events?.any { it.id == eventId } == true) {
+          FloatingDetailActions(
+            hazeState = hazeState,
+            onEdit = { page = "event_form" },
+            onDelete = { confirmDeleteEvent = true },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = FloatingTabBottomGap)
+          )
+        }
       }
+    }
+  }
+  if (confirmDeleteEvent && page == "event_detail") {
+    ConfirmDeleteDialog("删除倒数日", "此事件及其子事件将被删除。",
+      onDismiss = { confirmDeleteEvent = false }) {
+      confirmDeleteEvent = false
+      vm.write("DELETE", "/events/$eventId", onDone = { page = "home" })
     }
   }
 }

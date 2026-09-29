@@ -17,7 +17,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -79,21 +81,26 @@ fun EventEditorScreen(
     verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
   ) {
     FormSection("基本信息") {
-      OutlinedTextField(name, { name = it }, label = { Text("事件名称 *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+      OutlinedTextField(name, { name = it }, label = { FormFieldLabel("事件名称", required = true) },
+        singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
       SelectionField("日期类型", dateType.toString(), listOf("0" to "公历", "1" to "农历"), { dateType = it.toInt() })
       if (dateType == 0) {
-        SolarDateField("目标日期 *", targetDate, { targetDate = it })
+        SolarDateField("目标日期", targetDate, { targetDate = it }, required = true)
       } else {
-        Text("${lunarLabel(targetDate) ?: "农历日期"} · 对应公历 $targetDate")
-        TextButton(onClick = { showLunarPicker = true }) { Text("选择农历日期") }
+        FormFieldLabel("目标日期", required = true)
+        OutlinedButton(onClick = { showLunarPicker = true },
+          modifier = Modifier.fillMaxWidth().height(AppDimens.fieldHeight),
+          shape = MaterialTheme.shapes.medium) {
+          Text("${lunarLabel(targetDate) ?: "农历日期"} · $targetDate")
+        }
       }
       if (categories.isEmpty()) {
         Text("添加倒数日之前，需要先创建分类")
         TextButton(onClick = { showQuickCategory = true }) { Text("添加第一个分类") }
       } else {
         SelectionField(
-          "分类 *", categoryId.toString(), categories.map { it.id.toString() to it.name },
-          { categoryId = it.toInt() }
+          "分类", categoryId.toString(), categories.map { it.id.toString() to it.name },
+          { categoryId = it.toInt() }, required = true
         )
       }
     }
@@ -105,8 +112,9 @@ fun EventEditorScreen(
       )
       if (repeatType != 0) {
         OutlinedTextField(
-          repeatValue, { repeatValue = it }, label = { Text("每隔多少${listOf("", "天", "周", "月", "年")[repeatType]}") },
-          singleLine = true, modifier = Modifier.fillMaxWidth()
+          repeatValue, { repeatValue = it },
+          label = { FormFieldLabel("每隔多少${listOf("", "天", "周", "月", "年")[repeatType]}", required = true) },
+          singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
         )
       }
       Row(verticalAlignment = Alignment.CenterVertically) {
@@ -114,42 +122,52 @@ fun EventEditorScreen(
         Switch(pinned, { pinned = it })
       }
     }
-    FormSection("Webhook 提醒") {
+    FormSection("提醒") {
       Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("使用站外提醒渠道", modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+          Text("站外提醒", style = MaterialTheme.typography.titleSmall)
+          Text("通过 Webhook 渠道发送", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Switch(webhookEnabled, { webhookEnabled = it })
       }
       if (webhookEnabled) {
-        if (channels.isEmpty()) Text("先到“我的 → Webhook 渠道”添加并启用渠道")
-        SelectionField("提醒渠道", channelId.toString(), channels.map { it.id.toString() to it.name }, { channelId = it.toInt() })
-        OutlinedTextField(remindTitle, { remindTitle = it }, label = { Text("提醒标题（可选）") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(remindContent, { remindContent = it }, label = { Text("提醒内容（可选）") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+        if (channels.isEmpty()) Text("先到“我的 → Webhook 渠道”添加并启用渠道",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SelectionField("提醒渠道", channelId.toString(), channels.map { it.id.toString() to it.name },
+          { channelId = it.toInt() }, required = true)
+        OutlinedTextField(remindTitle, { remindTitle = it }, label = { Text("提醒标题（可选）") },
+          shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(remindContent, { remindContent = it }, label = { Text("提醒内容（可选）") },
+          minLines = 3, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
         Text("可使用 {{event_name}}、{{target_date}}、{{days}}", style = MaterialTheme.typography.bodySmall)
         SelectionField("提前提醒", advanceDays.toString(), (0..7).map { it.toString() to "$it 天" }, { advanceDays = it.toInt() })
         TimeField("提醒时间（北京时间）", remindTime, { remindTime = it })
       }
-    }
-    GlassPanel {
-      Column(Modifier.padding(AppDimens.cardInset),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-        Text("手机本地提醒", style = MaterialTheme.typography.titleMedium)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Text("在这台设备上通知", modifier = Modifier.weight(1f))
-          Switch(localEnabled, { enabled ->
-            if (enabled && Build.VERSION.SDK_INT >= 33 &&
-              context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-            ) {
-              permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-              localEnabled = enabled
-            }
-          })
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Text("本机通知", style = MaterialTheme.typography.titleSmall)
+          Text("只在这台设备上提醒", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (localEnabled) {
-          SelectionField("提前提醒", localAdvance.toString(), (0..7).map { it.toString() to "$it 天" }, { localAdvance = it.toInt() })
-          TimeField("提醒时间（北京时间）", localTime, { localTime = it })
-          Text("系统省电策略可能让通知稍晚送达；断网期间保留已安排的下一次提醒。", style = MaterialTheme.typography.bodySmall)
-        }
+        Switch(localEnabled, { enabled ->
+          if (enabled && Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+          ) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+          } else {
+            localEnabled = enabled
+          }
+        })
+      }
+      if (localEnabled) {
+        SelectionField("提前提醒", localAdvance.toString(), (0..7).map { it.toString() to "$it 天" }, { localAdvance = it.toInt() })
+        TimeField("提醒时间（北京时间）", localTime, { localTime = it })
+        Text("系统省电策略可能让通知稍晚送达；断网期间保留已安排的下一次提醒。",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
     Button(onClick = {
@@ -198,7 +216,8 @@ fun EventEditorScreen(
       title = { Text("添加分类") },
       text = {
         OutlinedTextField(
-          quickCategoryName, { quickCategoryName = it }, label = { Text("分类名称") }, singleLine = true
+          quickCategoryName, { quickCategoryName = it }, label = { FormFieldLabel("分类名称", required = true) },
+          singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
         )
       },
       confirmButton = {
@@ -242,13 +261,18 @@ fun SubEventEditorScreen(
     verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
   ) {
     FormSection("子事件信息") {
-      OutlinedTextField(name, { name = it }, label = { Text("子事件名称") }, modifier = Modifier.fillMaxWidth())
+      OutlinedTextField(name, { name = it }, label = { FormFieldLabel("子事件名称", required = true) },
+        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
       SelectionField("日期类型", dateType.toString(), listOf("0" to "公历", "1" to "农历"), { dateType = it.toInt() })
       if (dateType == 0) {
-        SolarDateField("目标日期", targetDate, { targetDate = it })
+        SolarDateField("目标日期", targetDate, { targetDate = it }, required = true)
       } else {
-        Text("${lunarLabel(targetDate) ?: "农历日期"} · 对应公历 $targetDate")
-        TextButton(onClick = { showLunarPicker = true }) { Text("选择农历日期") }
+        FormFieldLabel("目标日期", required = true)
+        OutlinedButton(onClick = { showLunarPicker = true },
+          modifier = Modifier.fillMaxWidth().height(AppDimens.fieldHeight),
+          shape = MaterialTheme.shapes.medium) {
+          Text("${lunarLabel(targetDate) ?: "农历日期"} · $targetDate")
+        }
       }
     }
     Button(onClick = {

@@ -13,8 +13,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 
-private val ink = Color(0xFF242B36)
-private val slate = Color(0xFF425A78)
+private val ink = Color(0xFF1D3044)
+private val blue = Color(0xFF1769C2)
 
 object AppDimens {
   val pageGutter = 20.dp
@@ -29,33 +29,33 @@ object AppDimens {
 }
 
 private val lightColors = lightColorScheme(
-  primary = slate,
+  primary = blue,
   onPrimary = Color.White,
-  primaryContainer = Color(0xFFE4EBF2),
+  primaryContainer = Color(0xFFE2F1FF),
   onPrimaryContainer = ink,
-  secondary = Color(0xFFA7664C),
-  background = Color(0xFFF6F5F2),
+  secondary = Color(0xFFC64F3E),
+  background = Color(0xFFF8FBFF),
   surface = Color(0xFFFFFFFF),
-  surfaceVariant = Color(0xFFF0EFEC),
-  outlineVariant = Color(0xFFE2E1DD),
+  surfaceVariant = Color(0xFFEDF6FF),
+  outlineVariant = Color(0xFFD8E7F4),
   onBackground = ink,
   onSurface = ink,
-  onSurfaceVariant = Color(0xFF646B74)
+  onSurfaceVariant = Color(0xFF52677D)
 )
 
 private val darkColors = darkColorScheme(
-  primary = Color(0xFFB9CDE8),
-  onPrimary = Color(0xFF22354F),
-  primaryContainer = Color(0xFF33465D),
-  onPrimaryContainer = Color(0xFFEAF2FF),
-  secondary = Color(0xFFE4AB91),
-  background = Color(0xFF151A21),
-  surface = Color(0xFF202731),
-  surfaceVariant = Color(0xFF29313D),
-  outlineVariant = Color(0xFF3A4552),
-  onBackground = Color(0xFFF1F3F5),
-  onSurface = Color(0xFFF1F3F5),
-  onSurfaceVariant = Color(0xFFBBC4CF)
+  primary = Color(0xFF89C9FF),
+  onPrimary = Color(0xFF123251),
+  primaryContainer = Color(0xFF254861),
+  onPrimaryContainer = Color(0xFFE2F2FF),
+  secondary = Color(0xFFFFAE90),
+  background = Color(0xFF152A3D),
+  surface = Color(0xFF1D3549),
+  surfaceVariant = Color(0xFF254157),
+  outlineVariant = Color(0xFF3B5B70),
+  onBackground = Color(0xFFF0F8FF),
+  onSurface = Color(0xFFF0F8FF),
+  onSurfaceVariant = Color(0xFFC3D6E5)
 )
 
 private val appShapes = Shapes(
