@@ -56,4 +56,5 @@ dependencies {
   implementation("cn.6tail:lunar:1.7.7")
   implementation("dev.chrisbanes.haze:haze:1.7.3")
   implementation("dev.chrisbanes.haze:haze-materials:1.7.3")
+  testImplementation("junit:junit:4.13.2")
 }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.EventNote
@@ -58,7 +59,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -109,15 +112,26 @@ fun AuthScreen(vm: MainViewModel, modifier: Modifier, contentPadding: PaddingVal
         OutlinedTextField(email, { email = it }, label = { FormFieldLabel("邮箱", required = true) },
           singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(
-          password, { password = it }, label = { FormFieldLabel("密码", required = true) }, singleLine = true,
-          visualTransformation = PasswordVisualTransformation(), shape = MaterialTheme.shapes.medium,
-          modifier = Modifier.fillMaxWidth()
+          password, { password = sanitizePasswordInput(it) },
+          label = { FormFieldLabel("密码", required = true) }, singleLine = true,
+          visualTransformation = PasswordVisualTransformation(),
+          keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password, autoCorrectEnabled = false,
+            hintLocales = LocaleList("en")
+          ),
+          supportingText = { Text("仅支持英文字母、数字和半角符号，不含空格") },
+          shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
         )
         if (register) {
           OutlinedTextField(
-            confirm, { confirm = it }, label = { FormFieldLabel("确认密码", required = true) }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth()
+            confirm, { confirm = sanitizePasswordInput(it) },
+            label = { FormFieldLabel("确认密码", required = true) }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+              keyboardType = KeyboardType.Password, autoCorrectEnabled = false,
+              hintLocales = LocaleList("en")
+            ),
+            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
           )
         }
         Button(onClick = {
