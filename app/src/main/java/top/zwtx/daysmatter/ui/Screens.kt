@@ -160,7 +160,9 @@ fun HomeScreen(
   modifier: Modifier, contentPadding: PaddingValues
 ) {
   val categories = snapshot?.categories.orEmpty()
-  val events = snapshot?.events.orEmpty().filter { categoryFilter == 0 || it.categoryId == categoryFilter }
+  val events = snapshot?.events.orEmpty()
+    .filter { categoryFilter == 0 || it.categoryId == categoryFilter }
+    .sortedByNearestDay()
   val categoryName = categories.find { it.id == categoryFilter }?.name ?: "全部记录"
   val emptyMessage = when {
     snapshot == null && offline -> "当前离线，暂无已同步的记录"

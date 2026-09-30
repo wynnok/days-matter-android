@@ -294,26 +294,45 @@ fun CategoryDrawer(
   ) {
     Column(Modifier.fillMaxHeight().padding(start = AppDimens.drawerOuterGutter,
       end = AppDimens.drawerOuterGutter, top = 24.dp, bottom = 20.dp)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
+      Row(
+        modifier = Modifier.padding(bottom = if (screen == "filters") AppDimens.sectionGap else 0.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
         if (screen != "filters") {
           IconButton(onClick = { screen = if (screen == "editor") "manage" else "filters" }) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
           }
         }
-        AnimatedContent(targetState = screen,
-          modifier = Modifier.weight(1f).padding(start = if (screen == "filters") 12.dp else 0.dp),
-          transitionSpec = { fadeIn(tween(170)) togetherWith fadeOut(tween(110)) },
-          label = "drawerTitle") { destination ->
-          Text(when (destination) {
-            "manage" -> "分类管理"
-            "editor" -> if (editingCategoryId == 0) "添加分类" else "编辑分类"
-            else -> "我的分类"
-          }, style = MaterialTheme.typography.titleLarge)
+        Column(
+          modifier = Modifier.weight(1f)
+            .padding(start = if (screen == "filters") AppDimens.drawerCardInset else 0.dp),
+          verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          AnimatedContent(targetState = screen,
+            transitionSpec = { fadeIn(tween(170)) togetherWith fadeOut(tween(110)) },
+            label = "drawerTitle") { destination ->
+            Text(when (destination) {
+              "manage" -> "分类管理"
+              "editor" -> if (editingCategoryId == 0) "添加分类" else "编辑分类"
+              else -> "按分类浏览"
+            }, style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+          }
+          if (screen == "filters") Text(
+            "每一类，都有值得记住的日子",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant
+          )
         }
-        IconButton(onClick = onClose) { Icon(Icons.Default.Close, "关闭分类抽屉") }
+        IconButton(onClick = onClose) {
+          Box(
+            Modifier.size(32.dp).background(colors.surfaceVariant, CircleShape),
+            contentAlignment = Alignment.Center
+          ) {
+            Icon(Icons.Default.Close, "关闭分类抽屉", tint = colors.onSurfaceVariant,
+              modifier = Modifier.size(18.dp))
+          }
+        }
       }
-      if (screen == "filters") Text("选择要看的日子", style = MaterialTheme.typography.bodyMedium,
-        color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 18.dp))
       Box(Modifier.weight(1f)) {
         AnimatedContent(
           targetState = screen,
