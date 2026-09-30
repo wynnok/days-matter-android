@@ -29,6 +29,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private set
   var busy by mutableStateOf(false)
     private set
+  var testingChannel by mutableStateOf(false)
+    private set
   var refreshing by mutableStateOf(false)
     private set
   var offline by mutableStateOf(false)
@@ -157,6 +159,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     offline = false
     syncFailed = false
     busy = false
+    testingChannel = false
     refreshing = false
   }
 
@@ -204,6 +207,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         report(error, current)
       } finally {
         if (session === current) busy = false
+      }
+    }
+  }
+
+  fun testChannel(body: JSONObject) {
+    val current = session ?: return
+    if (busy) return
+    viewModelScope.launch {
+      busy = true
+      testingChannel = true
+      try {
+        repository.write(current, "POST", "/remind-channels/test", body)
+        if (session === current) message = "测试消息已发送，请检查接收端"
+      } catch (error: Exception) {
+        report(error, current)
+      } finally {
+        if (session === current) {
+          testingChannel = false
+          busy = false
+        }
       }
     }
   }

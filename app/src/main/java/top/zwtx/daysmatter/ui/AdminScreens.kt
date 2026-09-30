@@ -26,11 +26,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -229,6 +231,27 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
     "feishu" to "飞书", "serverchan" to "Server酱", "custom" to "自定义 JSON"
   )
 
+  fun channelPayload(): JSONObject? {
+    if (!account.trim().startsWith("https://")) {
+      vm.showMessage("请填写 HTTPS Webhook 地址")
+      return null
+    }
+    if (format == "custom" && template.isBlank()) {
+      vm.showMessage("请填写自定义 JSON 模板")
+      return null
+    }
+    return JSONObject()
+      .put("channel_type", "webhook")
+      .put("account", account.trim())
+      .put("channel_name", name.trim())
+      .put("format_type", format)
+      .also { body ->
+        if (channelId != null) body.put("is_active", if (active) 1 else 0)
+        if (token.isNotBlank()) body.put("auth_token", token.trim())
+        if (format == "custom") body.put("body_template", template.trim())
+      }
+  }
+
   Column(
     Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
       .padding(AppDimens.pageGutter),
@@ -249,7 +272,7 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
           template, { template = it }, label = { Text("自定义 JSON 模板") },
           minLines = 5, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
         )
-        Text("支持 {{event_name}}、{{target_date}}、{{days}} 等占位符", style = MaterialTheme.typography.bodySmall)
+        Text("支持 {{title}} 和 {{content}}，字符串占位符需放在引号内", style = MaterialTheme.typography.bodySmall)
       }
       if (channelId != null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -261,23 +284,33 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
           color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
-    Button(onClick = {
-      if (!account.startsWith("https://") || name.isBlank()) {
-        vm.showMessage("请填写渠道名称和 HTTPS Webhook 地址")
-      } else {
-        val body = JSONObject()
-          .put("channel_type", "webhook")
-          .put("account", account.trim())
-          .put("channel_name", name.trim())
-          .put("format_type", format)
-        if (channelId != null) body.put("is_active", if (active) 1 else 0)
-        if (token.isNotBlank()) body.put("auth_token", token.trim())
-        if (format == "custom") body.put("body_template", template.trim())
-        vm.write(if (channelId == null) "POST" else "PUT",
-          if (channelId == null) "/remind-channels" else "/remind-channels/$channelId", body, onSaved)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+      OutlinedButton(onClick = {
+        channelPayload()?.let { body ->
+          if (channelId != null) body.put("channel_id", channelId)
+          vm.testChannel(body)
+        }
+      }, enabled = !vm.busy, modifier = Modifier.weight(1f).height(AppDimens.controlHeight)) {
+        if (vm.testingChannel) {
+          CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+          Spacer(Modifier.width(6.dp))
+        }
+        Text(if (vm.testingChannel) "测试中…" else "测试渠道")
       }
-    }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
-      Text("保存渠道")
+      Button(onClick = {
+        if (name.isBlank()) {
+          vm.showMessage("请填写渠道名称")
+        } else {
+          channelPayload()?.let { body ->
+            vm.write(if (channelId == null) "POST" else "PUT",
+              if (channelId == null) "/remind-channels" else "/remind-channels/$channelId", body, onSaved)
+          }
+        }
+      }, enabled = !vm.busy, modifier = Modifier.weight(1f).height(AppDimens.controlHeight)) {
+        Text("保存渠道")
+      }
     }
+    Text("测试会发送一条消息，不会保存当前修改。", style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant)
   }
 }
