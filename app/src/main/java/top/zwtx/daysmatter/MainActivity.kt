@@ -34,11 +34,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -126,6 +128,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
   var confirmDeleteEvent by remember { mutableStateOf(false) }
   var categoryFilter by rememberSaveable { mutableIntStateOf(0) }
   var exportText by remember { mutableStateOf<String?>(null) }
+  val homeStateHolder = key(vm.session?.userId) { rememberSaveableStateHolder() }
   val snackbar = remember { SnackbarHostState() }
   val hazeState = remember { HazeState() }
   val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -264,12 +267,14 @@ private fun DaysMatterApp(vm: MainViewModel) {
           if (vm.busy && !vm.refreshing) LinearProgressIndicator()
           if (vm.offline) OfflineBanner(vm.snapshot?.syncedAt)
           when (page) {
-            "home" -> HomeScreen(
-              vm.snapshot, vm.gridMode, vm.offline, vm.syncFailed, vm.refreshing, categoryFilter,
-              onRefresh = vm::refresh,
-              onEventClick = { eventId = it; page = "event_detail" },
-              modifier = Modifier.fillMaxSize(), contentPadding = screenPadding
-            )
+            "home" -> homeStateHolder.SaveableStateProvider(categoryFilter) {
+              HomeScreen(
+                vm.snapshot, vm.gridMode, vm.offline, vm.syncFailed, vm.refreshing, categoryFilter,
+                onRefresh = vm::refresh,
+                onEventClick = { eventId = it; page = "event_detail" },
+                modifier = Modifier.fillMaxSize(), contentPadding = screenPadding
+              )
+            }
             "profile" -> ProfileScreen(
               vm,
               onChannels = { page = "channels" },
@@ -290,7 +295,11 @@ private fun DaysMatterApp(vm: MainViewModel) {
             )
             "event_form" -> EventEditorScreen(
               vm, eventId.takeIf { it != 0 },
-              onSaved = { id -> eventId = id; page = "event_detail" },
+              onSaved = { id ->
+                if (eventId != 0) vm.showMessage("已更新")
+                eventId = id
+                page = "event_detail"
+              },
               contentPadding = screenPadding
             )
             "sub_form" -> SubEventEditorScreen(
