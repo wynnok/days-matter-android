@@ -359,7 +359,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
     ConfirmDeleteDialog("删除倒数日", "此事件及其子事件将被删除。",
       onDismiss = { confirmDeleteEvent = false }) {
       confirmDeleteEvent = false
-      vm.write("DELETE", "/events/$eventId", onDone = { page = "home" })
+      vm.write("DELETE", "/events/$eventId", onWritten = { page = "home" })
     }
   }
 }

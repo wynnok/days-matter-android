@@ -229,13 +229,13 @@ fun EventEditorScreen(
               .put("category_name", quickCategoryName.trim())
               .put("color", "#6366f1")
               .put("icon", "folder")
-            vm.write("POST", "/categories", body) {
+            vm.write("POST", "/categories", body) { result ->
               showQuickCategory = false
               quickCategoryName = ""
-              vm.snapshot?.categories?.maxByOrNull { it.id }?.let { categoryId = it.id }
+              categoryId = result.getInt("category_id")
             }
           }
-        }) { Text("创建") }
+        }, enabled = !vm.busy) { Text("创建") }
       },
       dismissButton = { TextButton(onClick = { showQuickCategory = false }) { Text("取消") } }
     )
@@ -286,7 +286,7 @@ fun SubEventEditorScreen(
         vm.write(
           if (subEventId == null) "POST" else "PUT",
           if (subEventId == null) "/events/$parentEventId/sub-events" else "/sub-events/$subEventId",
-          body, onSaved
+          body, { onSaved() }
         )
       }
     }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {

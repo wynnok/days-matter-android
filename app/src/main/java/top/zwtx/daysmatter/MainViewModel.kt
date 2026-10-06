@@ -85,6 +85,18 @@ class MainViewModel(application: Application, api: ApiClient) : AndroidViewModel
     syncFailed = false
   }
 
+  private fun reportAfterWrite(error: Exception, current: Session, successMessage: String) {
+    if (session !== current) return
+    if (error is ApiException && error.code == 401) {
+      logout()
+      message = "$successMessage，登录已失效，请重新登录"
+    } else {
+      offline = error is IOException
+      syncFailed = true
+      message = "$successMessage，但同步失败，请稍后刷新"
+    }
+  }
+
   fun refresh() {
     val current = session ?: return
     if (busy) return
@@ -192,18 +204,7 @@ class MainViewModel(application: Application, api: ApiClient) : AndroidViewModel
         snapshot?.let { store.saveSnapshot(current.userId, it) }
         load(current)
       } catch (error: Exception) {
-        if (session === current && saved) {
-          if (error is ApiException && error.code == 401) {
-            logout()
-            message = "资料已保存，登录已失效，请重新登录"
-          } else {
-            offline = error is IOException
-            syncFailed = true
-            message = "资料已保存，但同步失败，请稍后刷新"
-          }
-        } else {
-          report(error, current)
-        }
+        if (saved) reportAfterWrite(error, current, "资料已保存") else report(error, current)
       } finally {
         if (session === current) {
           busy = false
@@ -215,33 +216,43 @@ class MainViewModel(application: Application, api: ApiClient) : AndroidViewModel
 
   fun saveEvent(eventId: Int?, body: JSONObject, reminder: LocalReminder, onDone: (Int) -> Unit) {
     val current = session ?: return
+    if (busy) return
     viewModelScope.launch {
       busy = true
+      var saved = false
       try {
         val result = repository.write(
           current, if (eventId == null) "POST" else "PUT",
           if (eventId == null) "/events" else "/events/$eventId", body
         )
         if (session !== current) return@launch
+        saved = true
         val id = eventId ?: result.getInt("event_id")
+        message = "保存成功"
+        onDone(id)
         store.saveLocalReminder(current.userId, id, reminder)
         load(current)
-        if (session === current) onDone(id)
       } catch (error: Exception) {
-        report(error, current)
+        if (saved) reportAfterWrite(error, current, "保存成功") else report(error, current)
       } finally {
         if (session === current) busy = false
       }
     }
   }
 
-  fun write(method: String, path: String, body: JSONObject? = null, onDone: () -> Unit = {}) {
+  fun write(method: String, path: String, body: JSONObject? = null, onWritten: (JSONObject) -> Unit = {}) {
     val current = session ?: return
+    if (busy) return
     viewModelScope.launch {
       busy = true
+      var written = false
+      val successMessage = if (method == "DELETE") "删除成功" else "保存成功"
       try {
-        repository.write(current, method, path, body)
+        val result = repository.write(current, method, path, body)
         if (session !== current) return@launch
+        written = true
+        message = successMessage
+        onWritten(result)
         if (method == "DELETE" && path.startsWith("/events/")) {
           path.substringAfterLast('/').toIntOrNull()?.let { id ->
             scheduler.cancel(current.userId, id)
@@ -249,9 +260,8 @@ class MainViewModel(application: Application, api: ApiClient) : AndroidViewModel
           }
         }
         load(current)
-        if (session === current) onDone()
       } catch (error: Exception) {
-        report(error, current)
+        if (written) reportAfterWrite(error, current, successMessage) else report(error, current)
       } finally {
         if (session === current) busy = false
       }

@@ -152,7 +152,7 @@ fun CategoryEditorScreen(vm: MainViewModel, categoryId: Int?, onSaved: () -> Uni
           .put("icon", icon)
           .put("sort_order", existing?.sortOrder ?: 0)
         vm.write(if (categoryId == null) "POST" else "PUT",
-          if (categoryId == null) "/categories" else "/categories/$categoryId", body, onSaved)
+          if (categoryId == null) "/categories" else "/categories/$categoryId", body, { onSaved() })
       }
     }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
       Text("保存分类")
@@ -303,7 +303,7 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
         } else {
           channelPayload()?.let { body ->
             vm.write(if (channelId == null) "POST" else "PUT",
-              if (channelId == null) "/remind-channels" else "/remind-channels/$channelId", body, onSaved)
+              if (channelId == null) "/remind-channels" else "/remind-channels/$channelId", body, { onSaved() })
           }
         }
       }, enabled = !vm.busy, modifier = Modifier.weight(1f).height(AppDimens.controlHeight)) {
