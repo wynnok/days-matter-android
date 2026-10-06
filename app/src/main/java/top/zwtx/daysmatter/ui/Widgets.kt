@@ -63,17 +63,20 @@ fun CategoryIcon(identifier: String, color: String, size: Dp = 24.dp) {
 
 @Composable
 fun OfflineBanner(syncedAt: Long?) {
-  val time = syncedAt?.takeIf { it > 0 }?.let {
-    SimpleDateFormat("M月d日 HH:mm", Locale.CHINA).apply {
-      timeZone = TimeZone.getTimeZone("Asia/Shanghai")
-    }.format(Date(it))
-  }
+  val time = formatSyncTime(syncedAt)
   Card(Modifier.fillMaxWidth().padding(horizontal = AppDimens.pageGutter, vertical = 4.dp)) {
     Text(
-      "当前离线，显示${time?.let { " $it 同步的" } ?: ""}缓存数据。编辑需要联网。",
+      if (time == null) "当前离线，暂无已同步数据。请联网后重试。"
+      else "当前离线，显示 $time 同步的缓存数据。编辑需要联网。",
       modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall
     )
   }
+}
+
+fun formatSyncTime(syncedAt: Long?): String? = syncedAt?.takeIf { it > 0 }?.let {
+  SimpleDateFormat("M月d日 HH:mm", Locale.CHINA).apply {
+    timeZone = TimeZone.getTimeZone("Asia/Shanghai")
+  }.format(Date(it))
 }
 
 fun daysLabel(days: Int?): String = when {

@@ -170,12 +170,23 @@ fun HomeScreen(
     snapshot == null && offline -> "当前离线，暂无已同步的记录"
     snapshot == null && syncFailed -> "暂时无法同步，请下拉重试"
     snapshot == null -> "正在同步倒数日…"
+    events.isEmpty() && syncFailed -> "上次成功获取时暂无记录，当前数据尚未更新"
     events.isEmpty() && categoryFilter == 0 -> "还没有倒数日，点击下方 + 添加"
     events.isEmpty() -> "此分类暂无倒数日"
     else -> null
   }
   val header: @Composable () -> Unit = {
-    HomeHeader(snapshot, categoryName, events.size, onEventClick)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+      if (snapshot != null && syncFailed && !offline) {
+        GlassPanel {
+          Column(Modifier.padding(AppDimens.cardInset)) {
+            Text("同步失败，显示上次成功获取的数据")
+            TextButton(onClick = onRefresh, enabled = !refreshing) { Text("重试同步") }
+          }
+        }
+      }
+      HomeHeader(snapshot, categoryName, events.size, onEventClick)
+    }
   }
   PullToRefreshBox(
     isRefreshing = refreshing,
@@ -646,6 +657,8 @@ fun ProfileScreen(
           modifier = Modifier.padding(vertical = AppDimens.itemGap))
         Text(syncStatus, style = MaterialTheme.typography.labelMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("上次成功获取：${formatSyncTime(vm.snapshot?.syncedAt) ?: "尚未获取"}",
+          style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
     Column(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {

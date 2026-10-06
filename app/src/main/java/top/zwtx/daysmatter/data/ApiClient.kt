@@ -57,8 +57,9 @@ class ApiClient(baseUrl: String = BuildConfig.API_BASE_URL) {
   }
 
   suspend fun objectData(method: String, path: String, session: Session? = null, body: JSONObject? = null): JSONObject =
-    request(method, path, session, body).optJSONObject("data") ?: JSONObject()
+    request(method, path, session, body).optJSONObject("data")
+      ?: if (method == "GET") throw ApiException(502, "服务器返回了缺失的数据") else JSONObject()
 
   suspend fun arrayData(path: String, session: Session): JSONArray =
-    request("GET", path, session).optJSONArray("data") ?: JSONArray()
+    request("GET", path, session).optJSONArray("data") ?: throw ApiException(502, "服务器返回了缺失的列表数据")
 }

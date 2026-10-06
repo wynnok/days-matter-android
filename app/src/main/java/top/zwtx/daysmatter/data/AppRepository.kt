@@ -3,8 +3,9 @@ package top.zwtx.daysmatter.data
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import org.json.JSONObject
+import java.time.Clock
 
-class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClient()) {
+class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClient(), private val clock: Clock = Clock.systemUTC()) {
   suspend fun login(email: String, password: String): Session {
     val data = api.objectData(
       "POST", "/auth/login", body = JSONObject().put("email", email).put("password", password)
@@ -30,7 +31,7 @@ class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClien
       .put("categories", categories.await())
       .put("channels", channels.await())
       .put("events", events.await())
-      .put("synced_at", System.currentTimeMillis())
+      .put("synced_at", clock.millis())
     Snapshot.fromJson(raw).also { store.saveSnapshot(session.userId, it) }
   }
 

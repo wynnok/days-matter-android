@@ -19,11 +19,12 @@ import top.zwtx.daysmatter.reminder.ReminderScheduler
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.IOException
+import java.time.Clock
 
-class MainViewModel(application: Application, api: ApiClient) : AndroidViewModel(application) {
+class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clock.systemUTC()) : AndroidViewModel(application) {
   constructor(application: Application) : this(application, ApiClient())
   val store = LocalStore(application)
-  private val repository = AppRepository(store, api)
+  private val repository = AppRepository(store, api, clock)
   private val scheduler = ReminderScheduler(application, store)
 
   var session by mutableStateOf(store.loadSession())
