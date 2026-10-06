@@ -26,8 +26,8 @@
 - 网页／Worker 仓库：`/Users/milkyway/Public/DevHub/code/personal/days-matter/DaysMatter-CF`
   - 当前分支：`main`，领先 `origin/main` 5 个提交，未推送。
   - 最近已完成票提交：#5、#6、#7、#8 各有一个对应提交。
-  - #9 相关改动未提交。
-  - 工作区已有与本轮无关的 `.gitignore`、`CONTEXT.md`、`.tools/` 改动。
+  - #9 网页／Worker 草稿已提交并推送到 `codex/issue-9-channel-controls`，提交 `f502e6f`；`main` 不包含该 WIP。
+  - 工作区仍有与本轮无关的 `.gitignore`、`CONTEXT.md`、`.tools/` 改动。
 
 ## 规则来源
 
@@ -71,6 +71,8 @@
 - `tests/channel-worker.test.js` 追加了启停更新和账号隔离测试。
 
 ### 网页／Worker 当前验证问题
+
+先切到 `DaysMatter-CF` 仓库的 `codex/issue-9-channel-controls` 分支继续，不要在 `main` 上重新实现。
 
 - `node --test tests/channel-form.test.js`：6 项中 5 项通过；“启用开关成功后更新列表并渲染”失败。最后失败点是成功路径没有把测试里的复选框 `checked` 置为 true；需要核对 `toggleChannel` 成功分支与测试上下文。
 - `node --test tests/channel-worker.test.js`：旧有 2 项 Worker 测试通过；新追加的“真实 Worker 更新渠道启停并按账号隔离”失败。最后观察是第二个账号请求仍返回 200。这是测试替身问题：`first()` 虽按当前用户返回渠道存在性，但 `run()` 无条件为 `UPDATE remind_channels` 构造成功响应，没有检查 SQL `WHERE` 绑定中的 `user_id`。不要据此误判产品路由缺少账号隔离；真实 SQL 已包含 `WHERE channel_id = ? AND user_id = ?`。
@@ -136,6 +138,7 @@ Android 仓库：
 
 ## 提交与审查约定
 
+- #9 的网页／Worker WIP 在 `codex/issue-9-channel-controls`；完成并通过审查后可合并回该仓库 `main` 或按项目流程开 PR。
 - 每张 ticket 独立提交；提交信息引用对应 issue 编号。
 - 当前两仓库都在 `main`，继续按用户已授权方式提交到 `main`，不要推送。
 - 不要提交 `.tools/`、`app/release/`、`DaysMatter-CF` 软链接、以及与 ticket 无关的既有未提交文件。
