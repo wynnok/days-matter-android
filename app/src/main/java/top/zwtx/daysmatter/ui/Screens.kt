@@ -665,7 +665,7 @@ fun ProfileScreen(
       Text("设置", style = MaterialTheme.typography.titleMedium)
       GlassPanel {
         Column {
-          SettingsRow("Webhook 渠道", "配置站外提醒", onChannels)
+          SettingsRow("站外提醒", "配置 Webhook 提醒渠道", onChannels)
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("导出数据", "保存 JSON 备份", onExport)
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

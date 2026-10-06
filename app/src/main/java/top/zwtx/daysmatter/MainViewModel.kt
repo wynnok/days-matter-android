@@ -241,13 +241,39 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     }
   }
 
+  fun setChannelActive(channelId: Int, active: Boolean) {
+    val current = session ?: return
+    if (snapshot?.channels?.none { it.id == channelId } != false) return
+    writeAndRefresh("PUT", "/remind-channels/$channelId", JSONObject().put("is_active", if (active) 1 else 0),
+      if (active) "渠道已启用" else "渠道已停用") {
+      snapshot = snapshot?.let { existing ->
+        val raw = JSONObject(existing.raw.toString())
+        raw.optJSONArray("channels")?.let { channels ->
+          for (index in 0 until channels.length()) {
+            val channel = channels.getJSONObject(index)
+            if (channel.getInt("channel_id") == channelId) channel.put("is_active", if (active) 1 else 0)
+          }
+        }
+        existing.copy(channels = existing.channels.map {
+          if (it.id == channelId) it.copy(active = active) else it
+        }, raw = raw)
+      }
+      snapshot?.let { store.saveSnapshot(current.userId, it) }
+    }
+  }
+
   fun write(method: String, path: String, body: JSONObject? = null, onWritten: (JSONObject) -> Unit = {}) {
+    writeAndRefresh(method, path, body, if (method == "DELETE") "删除成功" else "保存成功", onWritten)
+  }
+
+  private fun writeAndRefresh(
+    method: String, path: String, body: JSONObject?, successMessage: String, onWritten: (JSONObject) -> Unit
+  ) {
     val current = session ?: return
     if (busy) return
     viewModelScope.launch {
       busy = true
       var written = false
-      val successMessage = if (method == "DELETE") "删除成功" else "保存成功"
       try {
         val result = repository.write(current, method, path, body)
         if (session !== current) return@launch
@@ -277,7 +303,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       testingChannel = true
       try {
         repository.write(current, "POST", "/remind-channels/test", body)
-        if (session === current) message = "测试消息已发送，请检查接收端"
+        if (session === current) message = "测试请求已完成，请检查接收端"
       } catch (error: Exception) {
         report(error, current)
       } finally {

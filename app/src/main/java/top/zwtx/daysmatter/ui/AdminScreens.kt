@@ -44,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -179,7 +181,7 @@ fun ChannelListScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Int) -> Uni
     Row(Modifier.fillMaxWidth().padding(horizontal = AppDimens.pageGutter, vertical = AppDimens.itemGap),
       verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
-        Text("提醒渠道", style = MaterialTheme.typography.titleMedium)
+        Text("站外提醒", style = MaterialTheme.typography.titleMedium)
         Text("共 ${channels.size} 个 Webhook 渠道", style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
@@ -197,7 +199,14 @@ fun ChannelListScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Int) -> Uni
               Text(channel.name, style = MaterialTheme.typography.titleSmall)
               Text("${channel.format} · ${if (channel.active) "已启用" else "已停用"}", style = MaterialTheme.typography.bodySmall)
               Text(channel.account, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+              Text(if (vm.snapshot?.raw?.optJSONArray("events") == null) "引用数量待获取" else
+                "被 ${vm.snapshot?.events.orEmpty().count { it.webhookEnabled && it.channelId == channel.id }} 个事件引用",
+                style = MaterialTheme.typography.bodySmall)
             }
+            Switch(channel.active, { vm.setChannelActive(channel.id, it) }, enabled = !vm.busy,
+              modifier = Modifier.semantics {
+                contentDescription = "${if (channel.active) "停用" else "启用"}${channel.name}"
+              })
             IconButton(onClick = { onEdit(channel.id) }) { Icon(Icons.Default.Edit, "编辑渠道") }
             IconButton(onClick = { deleteId = channel.id }) { Icon(Icons.Default.Delete, "删除渠道") }
           }
@@ -310,7 +319,7 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
         Text("保存渠道")
       }
     }
-    Text("测试会发送一条消息，不会保存当前修改。", style = MaterialTheme.typography.bodySmall,
+    Text("测试会发送一条消息，不会保存当前修改。请求完成不代表接收端已送达。", style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant)
   }
 }

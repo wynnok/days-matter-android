@@ -232,7 +232,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
     "event_detail" -> "倒数日详情"
     "event_form" -> if (eventId == 0) "添加倒数日" else "编辑倒数日"
     "sub_form" -> if (subEventId == 0) "添加子事件" else "编辑子事件"
-    "channels" -> "Webhook 渠道"
+    "channels" -> "站外提醒"
     "channel_form" -> if (channelId == 0) "添加渠道" else "编辑渠道"
     else -> "Days Matter"
   }
