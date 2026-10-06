@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -82,18 +83,18 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 
 class MainActivity : ComponentActivity() {
-  private lateinit var appViewModel: MainViewModel
+  private val appViewModel: MainViewModel by viewModels()
   private val networkCallback = object : ConnectivityManager.NetworkCallback() {
     override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
       val available = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-      runOnUiThread { if (::appViewModel.isInitialized) appViewModel.networkChanged(available) }
+      runOnUiThread { appViewModel.networkChanged(available) }
     }
     override fun onLost(network: Network) {
       runOnUiThread {
         val connectivity = getSystemService(ConnectivityManager::class.java)
         val available = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
           ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-        if (::appViewModel.isInitialized) appViewModel.networkChanged(available)
+        appViewModel.networkChanged(available)
       }
     }
   }
@@ -101,15 +102,14 @@ class MainActivity : ComponentActivity() {
   override fun onNewIntent(intent: android.content.Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
-    if (::appViewModel.isInitialized) appViewModel.openEvent(intent)
+    appViewModel.openEvent(intent)
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    val vm = appViewModel
+    if (savedInstanceState == null) vm.openEvent(intent)
     setContent {
-      val vm: MainViewModel = viewModel()
-      appViewModel = vm
-      LaunchedEffect(vm) { vm.openEvent(intent) }
       LaunchedEffect(vm) {
         val connectivity = getSystemService(ConnectivityManager::class.java)
         vm.networkChanged(connectivity.getNetworkCapabilities(connectivity.activeNetwork)
@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
     super.onStart()
     val connectivity = getSystemService(ConnectivityManager::class.java)
     connectivity.registerDefaultNetworkCallback(networkCallback)
-    if (::appViewModel.isInitialized) appViewModel.networkChanged(
+    appViewModel.networkChanged(
       connectivity.getNetworkCapabilities(connectivity.activeNetwork)
         ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     )
@@ -146,7 +146,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onResume() {
     super.onResume()
-    if (::appViewModel.isInitialized) appViewModel.refreshIfNeeded()
+    appViewModel.refreshIfNeeded()
   }
 
   override fun onStop() {

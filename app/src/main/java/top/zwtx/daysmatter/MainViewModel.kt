@@ -143,6 +143,7 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   private fun completeOperation(owner: Session?) {
     if (session !== owner) return
     busy = false
+    resolveEventTarget(failed = offline || syncFailed)
     if (pendingNetworkRecovery) {
       pendingNetworkRecovery = false
       refreshIfNeeded()
@@ -206,7 +207,6 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
         if (session === current) {
           refreshing = false
           completeOperation(current)
-          resolveEventTarget(failed = offline || syncFailed)
         }
       }
     }
@@ -232,7 +232,6 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
         report(error, current)
       } finally {
         if (session === authenticated) completeOperation(authenticated)
-        resolveEventTarget(failed = offline || syncFailed)
       }
     }
   }
@@ -257,7 +256,6 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
         report(error, current)
       } finally {
         if (session === authenticated) completeOperation(authenticated)
-        resolveEventTarget(failed = offline || syncFailed)
       }
     }
   }
