@@ -24,3 +24,5 @@ data class BackupPreview(val data: JSONObject, val summary: String) {
     }
   }
 }
+
+enum class ImportOutcome { UNKNOWN, REFRESH_FAILED, COMPLETE }

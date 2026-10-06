@@ -8,7 +8,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-class ApiException(val code: Int, message: String) : Exception(message)
+class ApiException(val code: Int, message: String, val outcomeUnknown: Boolean = false) : Exception(message)
 
 class ApiClient(baseUrl: String = BuildConfig.API_BASE_URL) {
   private val baseUrl = baseUrl.trimEnd('/')
@@ -19,6 +19,7 @@ class ApiClient(baseUrl: String = BuildConfig.API_BASE_URL) {
     session: Session? = null,
     body: JSONObject? = null
   ): JSONObject = withContext(Dispatchers.IO) {
+    val bodyBytes = body?.toString()?.toByteArray(Charsets.UTF_8)
     val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
       requestMethod = method
       connectTimeout = 15_000
@@ -28,15 +29,16 @@ class ApiClient(baseUrl: String = BuildConfig.API_BASE_URL) {
         setRequestProperty("X-User-Id", it.userId.toString())
         setRequestProperty("X-Auth-Token", it.token)
       }
-      if (body != null) {
+      if (bodyBytes != null) {
+        setFixedLengthStreamingMode(bodyBytes.size)
         doOutput = true
         setRequestProperty("Content-Type", "application/json; charset=utf-8")
       }
     }
 
     try {
-      if (body != null) {
-        connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+      if (bodyBytes != null) {
+        connection.outputStream.use { it.write(bodyBytes) }
       }
       val status = connection.responseCode
       val stream = if (status in 200..299) connection.inputStream else connection.errorStream
@@ -44,7 +46,7 @@ class ApiClient(baseUrl: String = BuildConfig.API_BASE_URL) {
       val response = try {
         JSONObject(content)
       } catch (_: Exception) {
-        throw ApiException(status, "服务器返回了无法解析的响应")
+        throw ApiException(status, "服务器返回了无法解析的响应", outcomeUnknown = true)
       }
       val code = response.optInt("code", status)
       if (status !in 200..299 || code != 200) {

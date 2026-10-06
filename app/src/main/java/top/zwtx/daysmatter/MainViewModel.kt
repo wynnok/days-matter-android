@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import top.zwtx.daysmatter.data.BackupDocuments
 import top.zwtx.daysmatter.data.BackupPreview
+import top.zwtx.daysmatter.data.ImportOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
@@ -181,6 +182,8 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     }
     importPreview = null
     importOwner = null
+    importOutcome = null
+    showingImportOutcome = false
     session = null
     lastExport = 0L
     snapshot = null
@@ -363,9 +366,21 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
   var importPreview by mutableStateOf<BackupPreview?>(null)
     private set
   private var importOwner: Session? = null
+  var importOutcome by mutableStateOf<ImportOutcome?>(null)
+    private set
+  var showingImportOutcome by mutableStateOf(false)
+    private set
+
+  fun viewImportedData() { if (!busy) showingImportOutcome = false }
 
   fun prepareImport(text: String, owner: Session? = session) {
     if (owner == null || session !== owner || busy) return
+    if (importOutcome == ImportOutcome.UNKNOWN) {
+      showingImportOutcome = true
+      message = "导入结果未知，可能已追加，请先刷新并核实数据，避免重复导入"
+      return
+    }
+    importOutcome = null
     try {
       importPreview = BackupPreview.parse(text)
       importOwner = owner
@@ -380,22 +395,73 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     importOwner = null
   }
 
+  fun acknowledgeImportOutcome() {
+    if (!busy) { importOutcome = null; showingImportOutcome = false }
+  }
+
+  fun refreshImportData() {
+    val current = session ?: return
+    if (busy) return
+    val unknown = importOutcome == ImportOutcome.UNKNOWN
+    viewModelScope.launch {
+      busy = true
+      refreshing = true
+      try {
+        load(current)
+        if (session === current) {
+          importOutcome = if (unknown) ImportOutcome.UNKNOWN else ImportOutcome.COMPLETE
+          message = if (unknown) "账号数据已刷新，请核对是否已追加，避免重复导入" else "导入请求已完成，账号数据已刷新"
+        }
+      } catch (error: Exception) {
+        if (session === current) {
+          offline = error is IOException
+          syncFailed = true
+          report(error, current)
+          if (session === current) message = if (unknown) "导入结果未知，刷新失败，请稍后核实账号数据" else "导入请求已完成，但刷新失败，请仅刷新账号数据"
+        }
+      } finally {
+        if (session === current) { busy = false; refreshing = false }
+      }
+    }
+  }
+
   fun confirmImport() {
     val current = importOwner ?: return
     val preview = importPreview ?: return
     if (session !== current || busy) return
     viewModelScope.launch {
       busy = true
+      var written = false
       try {
         repository.importData(current, preview.data)
+        written = true
         if (session !== current) return@launch
         importPreview = null
         importOwner = null
-        message = "导入请求已完成"
         load(current)
-        if (session === current) message = "导入请求已完成，账号数据已刷新"
+        if (session === current) {
+          importOutcome = ImportOutcome.COMPLETE
+          message = "导入请求已完成，账号数据已刷新"
+        }
       } catch (error: Exception) {
-        report(error, current)
+        if (session !== current) return@launch
+        if (written) {
+          reportAfterWrite(error, current, "导入请求已完成")
+          if (session === current) {
+            showingImportOutcome = true
+            importOutcome = ImportOutcome.REFRESH_FAILED
+            message = "导入请求已完成，但刷新失败，请仅刷新账号数据"
+          }
+        } else if (error is ApiException && error.code in 400..499 && !error.outcomeUnknown) {
+          report(error, current)
+          if (session === current) message = "导入请求被拒绝，请检查备份或重新登录"
+        } else {
+          importPreview = null
+          importOwner = null
+          showingImportOutcome = true
+          importOutcome = ImportOutcome.UNKNOWN
+          message = "导入结果未知，可能已追加，请先刷新并核实数据，避免重复导入"
+        }
       } finally {
         if (session === current) busy = false
       }

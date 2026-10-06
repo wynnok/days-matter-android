@@ -672,6 +672,15 @@ fun ProfileScreen(
           if (vm.lastExport > 0) Text("最近导出：已保存 · ${formatSyncTime(vm.lastExport)}", modifier = Modifier.padding(16.dp))
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("导入数据", "从 JSON 备份追加数据", onImport)
+          if (vm.importOutcome == top.zwtx.daysmatter.data.ImportOutcome.UNKNOWN || vm.importOutcome == top.zwtx.daysmatter.data.ImportOutcome.REFRESH_FAILED) {
+            Column(Modifier.padding(16.dp)) {
+              Text(if (vm.importOutcome == top.zwtx.daysmatter.data.ImportOutcome.UNKNOWN) "导入结果未知，可能已追加。先查看并核实账号数据，避免重复导入。" else "导入请求已完成，账号数据尚未刷新。")
+              TextButton(onClick = vm::refreshImportData, enabled = !vm.busy) { Text("仅刷新账号数据") }
+              if (vm.importOutcome == top.zwtx.daysmatter.data.ImportOutcome.UNKNOWN) {
+                TextButton(onClick = vm::acknowledgeImportOutcome, enabled = !vm.busy) { Text("已核实，重新选择备份") }
+              }
+            }
+          }
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

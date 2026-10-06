@@ -31,6 +31,9 @@ class BackupImportScreenTest {
   @get:Rule val compose = createComposeRule()
   private lateinit var server: HttpServer
   private lateinit var vm: MainViewModel
+  private var importCode = 200
+  private var disconnectImport = false
+  private var failRefresh = false
   private val writes = AtomicInteger()
   private val backup = """{"version":"1.0.0","data":{"categories":[{"category_id":1}],"remind_channels":[{"auth_token":"private-token"}],"events":[{"event_id":2}],"sub_events":[]}}"""
   @Before fun start() {
@@ -45,8 +48,10 @@ class BackupImportScreenTest {
         "/events" -> if (writes.get() == 0) JSONArray() else JSONArray().put(JSONObject().put("event_id", 7).put("event_name", "新事件"))
         else -> JSONArray()
       }
-      val bytes = JSONObject().put("code", 200).put("data", data).toString().toByteArray()
-      exchange.sendResponseHeaders(200, bytes.size.toLong()); exchange.responseBody.use { it.write(bytes) }
+      if (exchange.requestURI.path == "/data/import" && disconnectImport) { exchange.close(); return@createContext }
+      val code = if (exchange.requestURI.path == "/data/import") importCode else if (writes.get() > 0 && failRefresh) 503 else 200
+      val bytes = JSONObject().put("code", code).put("data", data).toString().toByteArray()
+      exchange.sendResponseHeaders(code, bytes.size.toLong()); exchange.responseBody.use { it.write(bytes) }
     }
     server.start()
     compose.runOnIdle {
@@ -54,7 +59,7 @@ class BackupImportScreenTest {
       vm.login("test@example.com", "password")
     }
     waitIdle()
-    compose.setContent { DaysMatterTheme(false) { BackupImportDialog(vm); vm.message?.let { Text(it) } } }
+    compose.setContent { DaysMatterTheme(false) { BackupImportDialog(vm); if (vm.importOutcome != top.zwtx.daysmatter.data.ImportOutcome.UNKNOWN && vm.importOutcome != top.zwtx.daysmatter.data.ImportOutcome.REFRESH_FAILED) vm.message?.let { Text(it) } } }
   }
   private fun waitIdle() = compose.waitUntil(5_000) { shadowOf(Looper.getMainLooper()).idle(); vm.session != null && !vm.busy }
   @After fun stop() { server.stop(0) }
@@ -72,6 +77,29 @@ class BackupImportScreenTest {
       assertEquals("新事件", vm.snapshot!!.events.single().name)
     }
     compose.onNodeWithText("导入请求已完成，账号数据已刷新").assertExists()
+  }
+  @Test fun unknownRequestDoesNotOfferUnexplainedRepeatAndOnlyRefreshes() {
+    disconnectImport = true
+    compose.runOnIdle { vm.prepareImport(backup) }
+    compose.onNodeWithText("确认追加").performClick(); waitIdle()
+    compose.onNodeWithText("导入结果未知，可能已追加，请先刷新并核实数据，避免重复导入").assertExists()
+    compose.onNodeWithText("仅刷新账号数据").performClick(); waitIdle()
+    compose.onNodeWithText("查看账号数据").performClick()
+    compose.runOnIdle {
+      assertEquals(top.zwtx.daysmatter.data.ImportOutcome.UNKNOWN, vm.importOutcome)
+      vm.prepareImport(backup)
+      vm.confirmImport()
+    }
+    assertEquals(1, writes.get())
+  }
+  @Test fun successfulWriteWithFailedReadRemainsCompleted() {
+    failRefresh = true
+    compose.runOnIdle { vm.prepareImport(backup) }
+    compose.onNodeWithText("确认追加").performClick(); waitIdle()
+    compose.onNodeWithText("导入请求已完成，但刷新失败，请仅刷新账号数据").assertExists()
+    failRefresh = false
+    compose.onNodeWithText("仅刷新账号数据").performClick(); waitIdle()
+    assertEquals(1, writes.get())
   }
   @Test fun canceledOrIncompatibleFilesNeverWrite() {
     compose.runOnIdle { vm.prepareImport(backup) }
