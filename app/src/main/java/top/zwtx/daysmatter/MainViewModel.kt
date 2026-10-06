@@ -3,6 +3,7 @@ package top.zwtx.daysmatter
 import android.app.Application
 import android.net.Uri
 import top.zwtx.daysmatter.data.BackupDocuments
+import top.zwtx.daysmatter.data.BackupPreview
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
@@ -178,6 +179,8 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       scheduler.cancelAll(it.userId)
       store.clearAccount(it.userId)
     }
+    importPreview = null
+    importOwner = null
     session = null
     lastExport = 0L
     snapshot = null
@@ -357,14 +360,40 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     }
   }
 
-  fun importData(text: String, onDone: () -> Unit = {}) {
-    val current = session ?: return
+  var importPreview by mutableStateOf<BackupPreview?>(null)
+    private set
+  private var importOwner: Session? = null
+
+  fun prepareImport(text: String, owner: Session? = session) {
+    if (owner == null || session !== owner || busy) return
+    try {
+      importPreview = BackupPreview.parse(text)
+      importOwner = owner
+    } catch (_: Exception) {
+      message = "备份格式或版本不兼容，请选择有效的账号备份"
+    }
+  }
+
+  fun cancelImport() {
+    if (busy) return
+    importPreview = null
+    importOwner = null
+  }
+
+  fun confirmImport() {
+    val current = importOwner ?: return
+    val preview = importPreview ?: return
+    if (session !== current || busy) return
     viewModelScope.launch {
       busy = true
       try {
-        repository.importData(current, JSONObject(text))
+        repository.importData(current, preview.data)
+        if (session !== current) return@launch
+        importPreview = null
+        importOwner = null
+        message = "导入请求已完成"
         load(current)
-        if (session === current) onDone()
+        if (session === current) message = "导入请求已完成，账号数据已刷新"
       } catch (error: Exception) {
         report(error, current)
       } finally {

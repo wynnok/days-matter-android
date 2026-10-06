@@ -165,16 +165,19 @@ private fun DaysMatterApp(vm: MainViewModel) {
     exportOwner = null
     exportText = null
   }
+  var importFileOwner by remember { mutableStateOf<top.zwtx.daysmatter.data.Session?>(null) }
   val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
     if (uri != null) {
       try {
         val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        if (content == null) vm.showMessage("无法读取文件") else vm.importData(content)
+        if (content == null) vm.showMessage("无法读取文件") else vm.prepareImport(content, importFileOwner)
       } catch (_: Exception) {
         vm.showMessage("读取文件失败")
       }
     }
   }
+
+  top.zwtx.daysmatter.ui.BackupImportDialog(vm)
 
   LaunchedEffect(vm.session?.userId) {
     page = "home"
@@ -305,7 +308,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
                   exportLauncher.launch("days-matter-backup.json")
                 }
               },
-              onImport = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
+              onImport = { importFileOwner = vm.session; importLauncher.launch(arrayOf("application/json", "text/plain")) },
               onHelp = { page = "help" },
               contentPadding = screenPadding
             )
