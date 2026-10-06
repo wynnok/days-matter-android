@@ -68,6 +68,12 @@ class LocalStore(private val context: Context) {
     null
   }
 
+  fun lastExport(userId: Int): Long = preferences.getLong("export_saved_$userId", 0)
+
+  fun recordExport(userId: Int, savedAt: Long) {
+    preferences.edit().putLong("export_saved_$userId", savedAt).apply()
+  }
+
   fun gridMode() = preferences.getBoolean("grid_mode", false)
 
   fun setGridMode(enabled: Boolean) {

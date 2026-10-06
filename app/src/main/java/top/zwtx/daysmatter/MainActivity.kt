@@ -148,6 +148,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
   var confirmDeleteEvent by remember { mutableStateOf(false) }
   var categoryFilter by rememberSaveable { mutableIntStateOf(0) }
   var exportText by remember { mutableStateOf<String?>(null) }
+  var exportOwner by remember { mutableStateOf<top.zwtx.daysmatter.data.Session?>(null) }
   val homeStateHolder = key(vm.session?.userId) { rememberSaveableStateHolder() }
   val snackbar = remember { SnackbarHostState() }
   val hazeState = remember { HazeState() }
@@ -158,14 +159,10 @@ private fun DaysMatterApp(vm: MainViewModel) {
 
   val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
     val content = exportText
-    if (uri != null && content != null) {
-      try {
-        context.contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray(Charsets.UTF_8)) }
-        vm.showMessage("数据已导出")
-      } catch (_: Exception) {
-        vm.showMessage("保存文件失败")
-      }
-    }
+    val owner = exportOwner
+    if (uri != null && content != null && owner != null) vm.saveExport(uri, content, owner)
+    else if (uri == null && owner === vm.session) vm.showMessage("已取消保存备份")
+    exportOwner = null
     exportText = null
   }
   val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -182,6 +179,8 @@ private fun DaysMatterApp(vm: MainViewModel) {
   LaunchedEffect(vm.session?.userId) {
     page = "home"
     categoryFilter = 0
+    exportText = null
+    exportOwner = null
   }
   LaunchedEffect(vm.message) {
     vm.message?.let {
@@ -301,6 +300,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
               onChannels = { page = "channels" },
               onExport = {
                 vm.exportData { text ->
+                  exportOwner = vm.session
                   exportText = text
                   exportLauncher.launch("days-matter-backup.json")
                 }

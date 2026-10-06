@@ -609,6 +609,7 @@ fun ProfileScreen(
 ) {
   val profile = vm.snapshot?.profile
   var editing by remember(vm.session?.userId) { mutableStateOf(false) }
+  var confirmingExport by remember { mutableStateOf(false) }
   var choosingAppearance by remember { mutableStateOf(false) }
   var nickname by remember(profile?.nickname) { mutableStateOf(profile?.nickname.orEmpty()) }
   var email by remember(profile?.email) { mutableStateOf(profile?.email.orEmpty()) }
@@ -667,7 +668,8 @@ fun ProfileScreen(
         Column {
           SettingsRow("站外提醒", "配置 Webhook 提醒渠道", onChannels)
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          SettingsRow("导出数据", "保存 JSON 备份", onExport)
+          SettingsRow("导出数据", "保存账号 JSON 备份") { confirmingExport = true }
+          if (vm.lastExport > 0) Text("最近导出：已保存 · ${formatSyncTime(vm.lastExport)}", modifier = Modifier.padding(16.dp))
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("导入数据", "从 JSON 备份追加数据", onImport)
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -681,6 +683,12 @@ fun ProfileScreen(
       Text("退出登录")
     }
     Spacer(Modifier.height(floatingTabContentClearance()))
+  }
+  if (confirmingExport) {
+    AlertDialog(onDismissRequest = { confirmingExport = false }, title = { Text("导出账号备份") },
+      text = { Text("包含分类、渠道信息、主事件和子事件，可能含 Webhook 地址与凭据，请妥善保管。不包含账号资料、本地提醒、外观或小组件实例。") },
+      confirmButton = { TextButton(onClick = { confirmingExport = false; onExport() }, enabled = !vm.busy) { Text("选择保存位置") } },
+      dismissButton = { TextButton(onClick = { confirmingExport = false }) { Text("取消") } })
   }
   if (editing) {
     AlertDialog(

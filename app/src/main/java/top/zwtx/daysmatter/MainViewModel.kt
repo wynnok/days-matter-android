@@ -1,6 +1,10 @@
 package top.zwtx.daysmatter
 
 import android.app.Application
+import android.net.Uri
+import top.zwtx.daysmatter.data.BackupDocuments
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -129,6 +133,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       try {
         session = repository.login(email.trim(), password)
         authenticated = session
+        lastExport = session?.let { store.lastExport(it.userId) } ?: 0L
         snapshot = session?.let { store.loadSnapshot(it.userId) }
         offline = false
         syncFailed = false
@@ -152,6 +157,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       try {
         session = repository.register(name.trim(), email.trim(), password)
         authenticated = session
+        lastExport = session?.let { store.lastExport(it.userId) } ?: 0L
         snapshot = null
         offline = false
         syncFailed = false
@@ -173,6 +179,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       store.clearAccount(it.userId)
     }
     session = null
+    lastExport = 0L
     snapshot = null
     offline = false
     syncFailed = false
@@ -315,8 +322,28 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     }
   }
 
+  var lastExport by mutableStateOf(session?.let { store.lastExport(it.userId) } ?: 0L)
+    private set
+
+  fun saveExport(uri: Uri, text: String, owner: Session) {
+    if (session !== owner) return
+    viewModelScope.launch {
+      try {
+        withContext(Dispatchers.IO) { BackupDocuments(getApplication<Application>().contentResolver).save(uri, text) }
+        if (session === owner) {
+          lastExport = System.currentTimeMillis()
+          store.recordExport(owner.userId, lastExport)
+          message = "备份已保存"
+        }
+      } catch (_: Exception) {
+        if (session === owner) message = "保存文件失败，请重新选择位置"
+      }
+    }
+  }
+
   fun exportData(onReady: (String) -> Unit) {
     val current = session ?: return
+    if (busy) return
     viewModelScope.launch {
       busy = true
       try {
