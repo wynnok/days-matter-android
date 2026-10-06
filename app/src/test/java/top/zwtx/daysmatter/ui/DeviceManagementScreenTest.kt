@@ -162,4 +162,17 @@ class DeviceManagementScreenTest {
     compose.onNodeWithText("本次提醒时间已过，无法据此判断之前是否送达").assertExists()
     compose.onNodeWithText("下一次已知提醒：2099-10-19 09:00（东八区）").assertDoesNotExist()
   }
+  @Test fun profileUsesSharedSummaryAndProvidesGroupedCategoryManagement() {
+    login()
+    compose.onNodeWithText("我的").performClick()
+    compose.onNodeWithText("事件总数 4 · 近期 7 天 0").assertExists()
+    compose.onNodeWithText("其中 2 个事件日期待同步").assertExists()
+    for (group in listOf("提醒与权限", "数据与同步", "分类与偏好", "关于与帮助")) {
+      compose.onNodeWithText(group).performScrollTo().assertExists()
+    }
+    compose.onNodeWithText("分类管理").performScrollTo().performClick()
+    compose.onNodeWithText("添加分类").assertExists()
+    compose.onNodeWithText("添加分类").performClick()
+    compose.onNodeWithText("分类名称", substring = true).assertExists()
+  }
 }

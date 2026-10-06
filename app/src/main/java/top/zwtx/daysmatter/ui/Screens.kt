@@ -72,6 +72,7 @@ import top.zwtx.daysmatter.data.Event
 import top.zwtx.daysmatter.data.AppearanceMode
 import top.zwtx.daysmatter.data.Snapshot
 import top.zwtx.daysmatter.data.overview
+import top.zwtx.daysmatter.data.forDisplay
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.ZoneId
@@ -605,9 +606,11 @@ fun ConfirmDeleteDialog(title: String, body: String, onDismiss: () -> Unit, onCo
 @Composable
 fun ProfileScreen(
   vm: MainViewModel, onChannels: () -> Unit,
-  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}, onLocalReminders: () -> Unit = {}
+  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}, onLocalReminders: () -> Unit = {}, onCategories: () -> Unit = {},
+  displaySnapshot: Snapshot? = vm.snapshot?.let { it.copy(events = it.events.map { event -> event.forDisplay() }) }
 ) {
-  val profile = vm.snapshot?.profile
+  val profile = displaySnapshot?.profile
+  val overview = displaySnapshot?.events?.overview()
   var editing by remember(vm.session?.userId) { mutableStateOf(false) }
   var confirmingExport by remember { mutableStateOf(false) }
   var choosingAppearance by remember { mutableStateOf(false) }
@@ -656,20 +659,24 @@ fun ProfileScreen(
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant,
           modifier = Modifier.padding(vertical = AppDimens.itemGap))
+        Text("事件总数 ${overview?.total ?: "—"} · 近期 7 天 ${overview?.upcoming ?: "—"}",
+          style = MaterialTheme.typography.bodyMedium)
+        if (overview != null && overview.pending > 0) Text("其中 ${overview.pending} 个事件日期待同步",
+          style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(syncStatus, style = MaterialTheme.typography.labelMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("上次成功获取：${formatSyncTime(vm.snapshot?.syncedAt) ?: "尚未获取"}",
           style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-      Text("设置", style = MaterialTheme.typography.titleMedium)
-      GlassPanel {
-        Column {
-          SettingsRow("本地提醒", "当前设备的通知、权限与测试", onLocalReminders)
-          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          SettingsRow("站外提醒", "配置 Webhook 提醒渠道", onChannels)
-          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    SettingsGroup("提醒与权限") {
+      SettingsRow("本地提醒", "当前设备的通知、权限与测试", onLocalReminders)
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+      SettingsRow("站外提醒", "配置 Webhook 提醒渠道", onChannels)
+    }
+    SettingsGroup("数据与同步") {
+      SettingsRow("同步状态与重试", syncStatus, vm::refresh)
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("导出数据", "保存账号 JSON 备份") { confirmingExport = true }
           if (vm.lastExport > 0) Text("最近导出：已保存 · ${formatSyncTime(vm.lastExport)}", modifier = Modifier.padding(16.dp))
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -683,12 +690,14 @@ fun ProfileScreen(
               }
             }
           }
-          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
-          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          SettingsRow("帮助与关于", "日期、备份、提醒及版本声明", onHelp)
-        }
-      }
+    }
+    SettingsGroup("分类与偏好") {
+      SettingsRow("分类管理", "管理分类名称、颜色与图标", onCategories)
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+      SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
+    }
+    SettingsGroup("关于与帮助") {
+      SettingsRow("帮助与关于", "日期、备份、提醒及版本声明", onHelp)
     }
     OutlinedButton(onClick = vm::logout, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
       Text("退出登录")
@@ -754,6 +763,14 @@ fun ProfileScreen(
       },
       confirmButton = { TextButton(onClick = { choosingAppearance = false }) { Text("取消") } }
     )
+  }
+}
+
+@Composable
+private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
+    Text(title, style = MaterialTheme.typography.titleMedium)
+    GlassPanel { Column { content() } }
   }
 }
 

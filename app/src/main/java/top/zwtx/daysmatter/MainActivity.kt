@@ -176,6 +176,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
   var channelId by rememberSaveable { mutableIntStateOf(0) }
   var subEventId by rememberSaveable { mutableIntStateOf(0) }
   var confirmDeleteEvent by remember { mutableStateOf(false) }
+  var editingCategoryId by rememberSaveable { mutableIntStateOf(0) }
   var categoryFilter by rememberSaveable { mutableIntStateOf(0) }
   var exportText by remember { mutableStateOf<String?>(null) }
   var exportOwner by remember { mutableStateOf<top.zwtx.daysmatter.data.Session?>(null) }
@@ -256,9 +257,10 @@ internal fun DaysMatterApp(vm: MainViewModel) {
     page = when (page) {
       "event_form" -> if (eventId == 0) "home" else "event_detail"
       "sub_form" -> "event_detail"
+      "category_form" -> "categories"
       "channel_form" -> "channels"
       "event_detail" -> "home"
-      "channels", "help", "local_reminders" -> "profile"
+      "channels", "help", "local_reminders", "categories" -> "profile"
       else -> "home"
     }
   }
@@ -273,6 +275,8 @@ internal fun DaysMatterApp(vm: MainViewModel) {
     "event_detail" -> "倒数日详情"
     "event_form" -> if (eventId == 0) "添加倒数日" else "编辑倒数日"
     "sub_form" -> if (subEventId == 0) "添加子事件" else "编辑子事件"
+    "categories" -> "分类管理"
+    "category_form" -> if (editingCategoryId == 0) "添加分类" else "编辑分类"
     "local_reminders" -> "本地提醒"
     "channels" -> "站外提醒"
                     "help" -> "帮助与关于"
@@ -350,6 +354,8 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               onImport = { importFileOwner = vm.session; importLauncher.launch(arrayOf("application/json", "text/plain")) },
               onHelp = { page = "help" },
               onLocalReminders = { page = "local_reminders" },
+              onCategories = { page = "categories" },
+              displaySnapshot = displaySnapshot,
               contentPadding = screenPadding
             )
             "event_detail" -> EventDetailScreen(
@@ -371,6 +377,11 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               vm, eventId, subEventId.takeIf { it != 0 },
               onSaved = { page = "event_detail" }, contentPadding = screenPadding
             )
+            "categories" -> top.zwtx.daysmatter.ui.CategoryListScreen(vm,
+              onAdd = { editingCategoryId = 0; page = "category_form" },
+              onEdit = { editingCategoryId = it; page = "category_form" }, contentPadding = screenPadding)
+            "category_form" -> top.zwtx.daysmatter.ui.CategoryEditorScreen(vm, editingCategoryId.takeIf { it != 0 },
+              onSaved = { page = "categories" }, contentPadding = screenPadding)
             "local_reminders" -> top.zwtx.daysmatter.ui.LocalReminderScreen(vm,
               onConfigure = { eventId = it; page = "event_form" }, contentPadding = screenPadding, displayInstant = displayInstant)
             "help" -> HelpScreen(screenPadding)
