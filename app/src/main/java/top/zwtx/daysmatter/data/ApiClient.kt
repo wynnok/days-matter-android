@@ -11,7 +11,7 @@ import java.net.URL
 class ApiException(val code: Int, message: String, val outcomeUnknown: Boolean = false) : Exception(message)
 
 class ApiClient(baseUrl: String = BuildConfig.API_BASE_URL) {
-  private val baseUrl = baseUrl.trimEnd('/')
+  val baseUrl = baseUrl.trimEnd('/')
 
   suspend fun request(
     method: String,

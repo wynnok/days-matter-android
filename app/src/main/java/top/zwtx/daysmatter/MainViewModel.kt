@@ -56,6 +56,52 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
   var appearanceMode by mutableStateOf(store.appearanceMode())
     private set
 
+  private val backend = api.baseUrl
+  private var pendingTarget = store.pendingEventTarget()
+  var eventNavigation by mutableStateOf<EventTarget?>(null)
+    private set
+
+  var eventEntryRequest by mutableStateOf(0)
+    private set
+
+  fun openEvent(intent: android.content.Intent) {
+    val target = EventTarget.fromIntent(intent) ?: return
+    eventNavigation = null
+    eventEntryRequest++
+    pendingTarget = target
+    store.savePendingEventTarget(target)
+    resolveEventTarget()
+  }
+
+  fun consumeEventNavigation() { eventNavigation = null }
+
+  private fun clearEventTarget() {
+    pendingTarget = null
+    store.savePendingEventTarget(null)
+  }
+
+  private fun resolveEventTarget(confirmed: Boolean = false, failed: Boolean = false) {
+    val target = pendingTarget ?: return
+    if (target.backend.trimEnd('/') != backend) {
+      clearEventTarget()
+      message = "事件属于其他服务，请在对应服务中打开"
+      return
+    }
+    val current = session ?: run { message = "请登录事件所属账号以打开此事件"; return }
+    if (target.userId != current.userId) {
+      clearEventTarget()
+      message = "事件属于其他账号，已返回首页"
+      return
+    }
+    if (snapshot?.events?.any { it.id == target.eventId } == true) {
+      eventNavigation = target
+      clearEventTarget()
+    } else if (confirmed || failed) {
+      clearEventTarget()
+      message = if (confirmed) "事件已删除或不可用，已返回首页" else "暂时无法获取事件，已返回首页，请联网后重试"
+    } else if (!busy) refresh()
+  }
+
   init {
     if (session != null) refresh()
   }
@@ -90,6 +136,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     scheduler.reschedule(session.userId, refreshed)
     offline = false
     syncFailed = false
+    resolveEventTarget(confirmed = true)
   }
 
   private fun reportAfterWrite(error: Exception, current: Session, successMessage: String) {
@@ -122,6 +169,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         if (session === current) {
           refreshing = false
           busy = false
+          resolveEventTarget(failed = offline || syncFailed)
         }
       }
     }
@@ -146,7 +194,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         syncFailed = current != null && (error !is ApiException || error.code != 401)
         report(error, current)
       } finally {
-        if (session === authenticated) busy = false
+        if (session === authenticated) { busy = false; resolveEventTarget(failed = offline || syncFailed) }
       }
     }
   }
@@ -170,7 +218,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         syncFailed = current != null && (error !is ApiException || error.code != 401)
         report(error, current)
       } finally {
-        if (session === authenticated) busy = false
+        if (session === authenticated) { busy = false; resolveEventTarget(failed = offline || syncFailed) }
       }
     }
   }
@@ -180,6 +228,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       scheduler.cancelAll(it.userId)
       store.clearAccount(it.userId)
     }
+    eventNavigation = null
     importPreview = null
     importOwner = null
     importOutcome = null

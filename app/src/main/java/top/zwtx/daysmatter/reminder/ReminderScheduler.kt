@@ -22,6 +22,8 @@ class ReminderScheduler(private val context: Context, private val store: LocalSt
       if (event != null) {
         putExtra("event_name", event.name)
         putExtra("event_id", event.id)
+        putExtra("user_id", userId)
+        putExtra("backend", top.zwtx.daysmatter.BuildConfig.API_BASE_URL.trimEnd('/'))
       }
     }
     return PendingIntent.getBroadcast(

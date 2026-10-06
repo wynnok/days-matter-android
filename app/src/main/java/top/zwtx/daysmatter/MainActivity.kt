@@ -90,11 +90,18 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    if (::appViewModel.isInitialized) appViewModel.openEvent(intent)
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContent {
       val vm: MainViewModel = viewModel()
       appViewModel = vm
+      LaunchedEffect(vm) { vm.openEvent(intent) }
       val systemDark = isSystemInDarkTheme()
       val dark = when (vm.appearanceMode) {
         AppearanceMode.LIGHT -> false
@@ -128,7 +135,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DaysMatterApp(vm: MainViewModel) {
+internal fun DaysMatterApp(vm: MainViewModel) {
   val lifecycle = LocalLifecycleOwner.current.lifecycle
   val displayInstant by produceState(Instant.now(), lifecycle) {
     lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -179,11 +186,19 @@ private fun DaysMatterApp(vm: MainViewModel) {
 
   top.zwtx.daysmatter.ui.BackupImportDialog(vm)
 
-  LaunchedEffect(vm.session?.userId) {
+  LaunchedEffect(vm.session?.userId, vm.eventEntryRequest) {
     page = "home"
     categoryFilter = 0
     exportText = null
     exportOwner = null
+  }
+  LaunchedEffect(vm.session?.userId, vm.eventNavigation) {
+    val target = vm.eventNavigation
+    if (target != null && target.userId == vm.session?.userId) {
+      eventId = target.eventId
+      page = "event_detail"
+      vm.consumeEventNavigation()
+    }
   }
   LaunchedEffect(vm.message) {
     vm.message?.let {
