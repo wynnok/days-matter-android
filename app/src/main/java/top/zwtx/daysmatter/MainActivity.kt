@@ -372,7 +372,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               onSaved = { page = "event_detail" }, contentPadding = screenPadding
             )
             "local_reminders" -> top.zwtx.daysmatter.ui.LocalReminderScreen(vm,
-              onConfigure = { eventId = it; page = "event_form" }, contentPadding = screenPadding)
+              onConfigure = { eventId = it; page = "event_form" }, contentPadding = screenPadding, displayInstant = displayInstant)
             "help" -> HelpScreen(screenPadding)
             "channels" -> ChannelListScreen(
               vm, onAdd = { channelId = 0; page = "channel_form" },

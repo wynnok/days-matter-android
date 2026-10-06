@@ -24,15 +24,15 @@ import top.zwtx.daysmatter.reminder.label
 import java.time.Instant
 
 @Composable
-fun LocalReminderScreen(vm: MainViewModel, onConfigure: (Int) -> Unit, contentPadding: PaddingValues) {
+fun LocalReminderScreen(vm: MainViewModel, onConfigure: (Int) -> Unit, contentPadding: PaddingValues, displayInstant: Instant = Instant.now()) {
   val context = LocalContext.current
   val lifecycle = LocalLifecycleOwner.current.lifecycle
   val notifications = remember(context) { ReminderNotifications(context).also { it.createChannel() } }
   var revision by remember { mutableIntStateOf(0) }
-  var now by remember { mutableStateOf(Instant.now()) }
+  val now = displayInstant
   DisposableEffect(lifecycle) {
     val observer = LifecycleEventObserver { _, event ->
-      if (event == Lifecycle.Event.ON_RESUME) { revision++; now = Instant.now() }
+      if (event == Lifecycle.Event.ON_RESUME) revision++
     }
     lifecycle.addObserver(observer)
     onDispose { lifecycle.removeObserver(observer) }

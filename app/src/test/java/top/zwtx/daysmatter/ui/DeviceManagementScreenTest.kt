@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit
 class DeviceManagementScreenTest {
   @get:Rule val keys = TestKeyStore()
   @get:Rule val compose = createComposeRule()
+  private val reminderTime = androidx.compose.runtime.mutableStateOf<java.time.Instant?>(null)
   private lateinit var activityContext: android.content.Context
   private lateinit var vm: MainViewModel
   private lateinit var server: HttpServer
@@ -64,7 +65,11 @@ class DeviceManagementScreenTest {
     server.start()
     backend = "http://127.0.0.1:${server.address.port}"
     compose.runOnIdle { vm = MainViewModel(app, ApiClient(backend)) }
-    compose.setContent { activityContext = androidx.compose.ui.platform.LocalContext.current; DaysMatterTheme(false) { DaysMatterApp(vm) } }
+    compose.setContent { activityContext = androidx.compose.ui.platform.LocalContext.current; DaysMatterTheme(false) {
+      if (reminderTime.value == null) DaysMatterApp(vm) else {
+        LocalReminderScreen(vm, {}, androidx.compose.foundation.layout.PaddingValues(), reminderTime.value!!)
+      }
+    } }
   }
 
   @After fun stop() {
@@ -147,5 +152,14 @@ class DeviceManagementScreenTest {
     compose.onNodeWithText("测试通知").performScrollTo().performClick()
     compose.onNodeWithText("事件提醒渠道已关闭，请在系统设置中开启").assertExists()
     assertEquals(0, shadowOf(notifications).allNotifications.size)
+  }
+  @Test fun visibleReminderOverviewAdvancesPastItsKnownDeadline() {
+    top.zwtx.daysmatter.data.LocalStore(app).saveLocalReminder(7, 11, top.zwtx.daysmatter.data.LocalReminder(true, 1, "09:00"))
+    compose.runOnIdle { reminderTime.value = java.time.Instant.parse("2099-10-19T00:59:00Z") }
+    login()
+    compose.onNodeWithText("下一次已知提醒：2099-10-19 09:00（东八区）").performScrollTo().assertExists()
+    compose.runOnIdle { reminderTime.value = java.time.Instant.parse("2099-10-19T01:00:00Z") }
+    compose.onNodeWithText("本次提醒时间已过，无法据此判断之前是否送达").assertExists()
+    compose.onNodeWithText("下一次已知提醒：2099-10-19 09:00（东八区）").assertDoesNotExist()
   }
 }
