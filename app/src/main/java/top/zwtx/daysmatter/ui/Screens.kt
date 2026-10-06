@@ -605,7 +605,7 @@ fun ConfirmDeleteDialog(title: String, body: String, onDismiss: () -> Unit, onCo
 @Composable
 fun ProfileScreen(
   vm: MainViewModel, onChannels: () -> Unit,
-  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues
+  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}
 ) {
   val profile = vm.snapshot?.profile
   var editing by remember(vm.session?.userId) { mutableStateOf(false) }
@@ -672,6 +672,8 @@ fun ProfileScreen(
           SettingsRow("导入数据", "从 JSON 备份追加数据", onImport)
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
+          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+          SettingsRow("帮助与关于", "日期、备份、提醒及版本声明", onHelp)
         }
       }
     }

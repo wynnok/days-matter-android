@@ -71,6 +71,7 @@ import top.zwtx.daysmatter.ui.FloatingTabBar
 import top.zwtx.daysmatter.ui.FloatingTabBottomGap
 import top.zwtx.daysmatter.ui.floatingTabContentClearance
 import top.zwtx.daysmatter.ui.HomeTopBar
+import top.zwtx.daysmatter.ui.HelpScreen
 import top.zwtx.daysmatter.ui.HomeScreen
 import top.zwtx.daysmatter.ui.OfflineBanner
 import top.zwtx.daysmatter.ui.ProfileScreen
@@ -217,7 +218,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
       "sub_form" -> "event_detail"
       "channel_form" -> "channels"
       "event_detail" -> "home"
-      "channels" -> "profile"
+      "channels", "help" -> "profile"
       else -> "home"
     }
   }
@@ -233,6 +234,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
     "event_form" -> if (eventId == 0) "添加倒数日" else "编辑倒数日"
     "sub_form" -> if (subEventId == 0) "添加子事件" else "编辑子事件"
     "channels" -> "站外提醒"
+                    "help" -> "帮助与关于"
     "channel_form" -> if (channelId == 0) "添加渠道" else "编辑渠道"
     else -> "Days Matter"
   }
@@ -304,6 +306,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
                 }
               },
               onImport = { importLauncher.launch(arrayOf("application/json", "text/plain")) },
+              onHelp = { page = "help" },
               contentPadding = screenPadding
             )
             "event_detail" -> EventDetailScreen(
@@ -325,6 +328,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
               vm, eventId, subEventId.takeIf { it != 0 },
               onSaved = { page = "event_detail" }, contentPadding = screenPadding
             )
+            "help" -> HelpScreen(screenPadding)
             "channels" -> ChannelListScreen(
               vm, onAdd = { channelId = 0; page = "channel_form" },
               onEdit = { channelId = it; page = "channel_form" }, contentPadding = screenPadding
