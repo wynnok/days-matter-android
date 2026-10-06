@@ -35,6 +35,18 @@ android {
     buildConfig = true
   }
 
+  testOptions.unitTests.isIncludeAndroidResources = true
+  testOptions.unitTests.all {
+    val testHome = rootProject.file(".tools/test-home")
+    val testTemp = rootProject.file(".tools/test-temp")
+    it.systemProperty("user.home", testHome.path)
+    it.systemProperty("java.io.tmpdir", testTemp.path)
+    it.doFirst {
+      testHome.mkdirs()
+      testTemp.mkdirs()
+    }
+  }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -57,4 +69,8 @@ dependencies {
   implementation("dev.chrisbanes.haze:haze:1.7.3")
   implementation("dev.chrisbanes.haze:haze-materials:1.7.3")
   testImplementation("junit:junit:4.13.2")
+  testImplementation(composeBom)
+  testImplementation("androidx.compose.ui:ui-test-junit4")
+  testImplementation("org.robolectric:robolectric:4.17")
+  debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

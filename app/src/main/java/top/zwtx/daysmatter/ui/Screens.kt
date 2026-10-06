@@ -53,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -70,6 +71,7 @@ import top.zwtx.daysmatter.R
 import top.zwtx.daysmatter.data.Event
 import top.zwtx.daysmatter.data.AppearanceMode
 import top.zwtx.daysmatter.data.Snapshot
+import top.zwtx.daysmatter.data.overview
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.ZoneId
@@ -228,7 +230,7 @@ private fun HomeHeader(
     Row(Modifier.fillMaxWidth(),
       verticalAlignment = Alignment.CenterVertically) {
       Text(categoryName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-      Text("$eventCount 个日子", color = MaterialTheme.colorScheme.onSurfaceVariant,
+      Text(if (snapshot == null) "— 个日子" else "$eventCount 个日子", color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall)
     }
   }
@@ -247,7 +249,7 @@ private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modif
   val next = events.filter { (it.daysDiff ?: -1) >= 0 }.minByOrNull { it.daysDiff ?: Int.MAX_VALUE }
   val featured = next ?: events.filter { (it.daysDiff ?: 0) < 0 }.maxByOrNull { it.daysDiff ?: Int.MIN_VALUE }
     ?: events.firstOrNull { it.daysDiff == null }
-  val upcoming = events.count { (it.daysDiff ?: -1) > 0 }
+  val overview = snapshot?.events?.overview()
   val date = featured?.let {
     if (it.daysDiff == null) "日期待同步"
     else "${if (it.daysDiff < 0) "最近经过" else "下一次"} · ${readableDate(it.nextOccurrence ?: it.targetDate)}"
@@ -289,16 +291,21 @@ private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modif
           }
         }
       } else {
-        Text("把重要的日子放在眼前", color = Color.White,
+        Text(if (snapshot == null) "尚无已同步数据" else "把重要的日子放在眼前", color = Color.White,
           style = MaterialTheme.typography.titleLarge)
       }
       Spacer(Modifier.height(AppDimens.sectionGap))
       HorizontalDivider(color = Color.White.copy(alpha = 0.34f))
       Spacer(Modifier.height(12.dp))
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        OverviewStat("${events.size}", "全部记录", Modifier.weight(1f))
+        OverviewStat(overview?.total?.toString() ?: "—", "事件总数", Modifier.weight(1f))
         Box(Modifier.width(1.dp).height(22.dp).background(Color.White.copy(alpha = 0.34f)))
-        OverviewStat("$upcoming", "即将到来", Modifier.weight(1f))
+        OverviewStat(overview?.upcoming?.toString() ?: "—", "近期 7 天", Modifier.weight(1f))
+      }
+      if (overview != null && overview.pending > 0) {
+        Spacer(Modifier.height(8.dp))
+        Text("其中 ${overview.pending} 个事件日期待同步", color = Color.White.copy(alpha = 0.94f),
+          style = MaterialTheme.typography.labelMedium)
       }
     }
   }
@@ -306,7 +313,7 @@ private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modif
 
 @Composable
 private fun OverviewStat(value: String, label: String, modifier: Modifier = Modifier) {
-  Row(modifier,
+  Row(modifier.semantics(mergeDescendants = true) {},
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.Center) {
     Text(value, color = Color.White, style = MaterialTheme.typography.titleMedium)
