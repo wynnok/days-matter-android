@@ -77,11 +77,14 @@ fun OfflineBanner(syncedAt: Long?) {
 }
 
 fun daysLabel(days: Int?): String = when {
-  days == null -> "日期待同步"
+  days == null -> pendingDateLabel(0)
   days == 0 -> "就是今天"
   days > 0 -> "还有 $days 天"
   else -> "已过 ${-days} 天"
 }
+
+fun pendingDateLabel(repeatType: Int): String =
+  if (repeatType != 0) "待同步下一次日期" else "日期待同步"
 
 @Composable
 fun FormFieldLabel(text: String, required: Boolean = false) {

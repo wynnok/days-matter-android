@@ -246,9 +246,11 @@ private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modif
   val events = snapshot?.events.orEmpty()
   val next = events.filter { (it.daysDiff ?: -1) >= 0 }.minByOrNull { it.daysDiff ?: Int.MAX_VALUE }
   val featured = next ?: events.filter { (it.daysDiff ?: 0) < 0 }.maxByOrNull { it.daysDiff ?: Int.MIN_VALUE }
+    ?: events.firstOrNull { it.daysDiff == null }
   val upcoming = events.count { (it.daysDiff ?: -1) > 0 }
   val date = featured?.let {
-    "${if ((it.daysDiff ?: 0) < 0) "最近经过" else "下一次"} · ${readableDate(it.nextOccurrence ?: it.targetDate)}"
+    if (it.daysDiff == null) "日期待同步"
+    else "${if (it.daysDiff < 0) "最近经过" else "下一次"} · ${readableDate(it.nextOccurrence ?: it.targetDate)}"
   }
     ?: LocalDate.now(ZoneId.of("Asia/Shanghai"))
       .format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA))
@@ -261,7 +263,7 @@ private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modif
       Text(date, color = Color.White.copy(alpha = 0.94f), style = MaterialTheme.typography.labelMedium)
       Spacer(Modifier.height(14.dp))
       if (featured != null) {
-        val days = featured.daysDiff ?: 0
+        val days = featured.daysDiff
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(12.dp)) {
           Column(Modifier.weight(1f)) {
@@ -270,13 +272,18 @@ private fun HomeOverview(snapshot: Snapshot?, onEventClick: (Int) -> Unit, modif
           }
           Column(horizontalAlignment = Alignment.End) {
             Text(when {
+              days == null -> "—"
               days == 0 -> "今天"
               days < 0 -> "${-days.toLong()}"
               else -> "$days"
             }, color = Color.White,
               fontSize = if (days == 0) 28.sp else 42.sp,
               lineHeight = 46.sp, fontWeight = FontWeight.SemiBold)
-            if (days != 0) Text(if (days < 0) "天前" else "天后",
+            if (days != 0) Text(when {
+              days == null -> pendingDateLabel(featured.repeatType)
+              days < 0 -> "天前"
+              else -> "天后"
+            },
               color = Color.White.copy(alpha = 0.94f),
               style = MaterialTheme.typography.labelMedium)
           }
@@ -311,7 +318,7 @@ private fun OverviewStat(value: String, label: String, modifier: Modifier = Modi
 @Composable
 private fun EventCard(event: Event, grid: Boolean, onClick: () -> Unit) {
   val nextDate = event.nextOccurrence ?: event.targetDate
-  val dateLabel = compactDate(nextDate)
+  val dateLabel = if (event.daysDiff == null) "日期待同步" else compactDate(nextDate)
   val count = when {
     event.daysDiff == null -> "—"
     event.daysDiff == 0 -> "今天"
@@ -319,7 +326,7 @@ private fun EventCard(event: Event, grid: Boolean, onClick: () -> Unit) {
     else -> "${event.daysDiff}"
   }
   val suffix = when {
-    event.daysDiff == null -> "待同步"
+    event.daysDiff == null -> pendingDateLabel(event.repeatType)
     event.daysDiff == 0 -> ""
     event.daysDiff > 0 -> "天后"
     else -> "天前"
@@ -378,9 +385,10 @@ private fun EventIcon(event: Event) {
 @Composable
 fun EventDetailScreen(
   vm: MainViewModel, eventId: Int,
-  onAddSub: () -> Unit, onEditSub: (Int) -> Unit, contentPadding: PaddingValues
+  onAddSub: () -> Unit, onEditSub: (Int) -> Unit, contentPadding: PaddingValues,
+  snapshot: Snapshot?
 ) {
-  val event = vm.snapshot?.events?.find { it.id == eventId }
+  val event = snapshot?.events?.find { it.id == eventId }
   var subToDelete by remember(eventId) { mutableStateOf<Int?>(null) }
   if (event == null) {
     EmptyState("未找到事件，请同步后重试")
@@ -395,7 +403,7 @@ fun EventDetailScreen(
     else -> event.daysDiff.toString()
   }
   val countdownUnit = when {
-    event.daysDiff == null -> "日期待同步"
+    event.daysDiff == null -> pendingDateLabel(event.repeatType)
     event.daysDiff == 0 -> ""
     event.daysDiff > 0 -> "天后"
     else -> "天前"
@@ -434,10 +442,10 @@ fun EventDetailScreen(
         Text(if (event.repeatType == 0) "目标日期" else "下一次日期",
           style = MaterialTheme.typography.labelMedium,
           color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f))
-        Text(if (event.repeatType != 0 && event.nextOccurrence == null) "等待同步"
+        Text(if (event.daysDiff == null) "等待同步"
           else readableDate(nextDate), style = MaterialTheme.typography.titleMedium,
           color = MaterialTheme.colorScheme.onPrimaryContainer)
-        if (event.dateType == 1 && (event.repeatType == 0 || event.nextOccurrence != null)) lunarLabel(nextDate)?.let {
+        if (event.dateType == 1 && event.daysDiff != null) lunarLabel(nextDate)?.let {
           Text(it, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f))
         }
@@ -504,8 +512,8 @@ fun EventDetailScreen(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
               Text(sub.name, style = MaterialTheme.typography.titleMedium)
               val subDate = sub.nextOccurrence ?: sub.targetDate
-              val lunar = if (sub.dateType == 1) lunarLabel(subDate) else null
-              Text("${readableDate(subDate)} · ${daysLabel(sub.daysDiff)}",
+              val lunar = if (sub.dateType == 1 && sub.daysDiff != null) lunarLabel(subDate) else null
+              Text(if (sub.daysDiff == null) "日期待同步" else "${readableDate(subDate)} · ${daysLabel(sub.daysDiff)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
               if (lunar != null) Text(lunar, style = MaterialTheme.typography.bodySmall,

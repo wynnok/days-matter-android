@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,7 +53,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import top.zwtx.daysmatter.data.AppearanceMode
+import top.zwtx.daysmatter.data.forDisplay
 import top.zwtx.daysmatter.ui.AuthScreen
 import top.zwtx.daysmatter.ui.CategoryDrawer
 import top.zwtx.daysmatter.ui.ChannelEditorScreen
@@ -71,6 +76,8 @@ import top.zwtx.daysmatter.ui.OfflineBanner
 import top.zwtx.daysmatter.ui.ProfileScreen
 import top.zwtx.daysmatter.ui.SubEventEditorScreen
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import java.time.Instant
 
 class MainActivity : ComponentActivity() {
   private lateinit var appViewModel: MainViewModel
@@ -121,6 +128,18 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DaysMatterApp(vm: MainViewModel) {
+  val lifecycle = LocalLifecycleOwner.current.lifecycle
+  val displayInstant by produceState(Instant.now(), lifecycle) {
+    lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+      while (true) {
+        value = Instant.now()
+        delay(30_000)
+      }
+    }
+  }
+  val displaySnapshot = vm.snapshot?.let { snapshot ->
+    snapshot.copy(events = snapshot.events.map { it.forDisplay(displayInstant) })
+  }
   var page by rememberSaveable { mutableStateOf("home") }
   var eventId by rememberSaveable { mutableIntStateOf(0) }
   var channelId by rememberSaveable { mutableIntStateOf(0) }
@@ -269,7 +288,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
           when (page) {
             "home" -> homeStateHolder.SaveableStateProvider(categoryFilter) {
               HomeScreen(
-                vm.snapshot, vm.gridMode, vm.offline, vm.syncFailed, vm.refreshing, categoryFilter,
+                displaySnapshot, vm.gridMode, vm.offline, vm.syncFailed, vm.refreshing, categoryFilter,
                 onRefresh = vm::refresh,
                 onEventClick = { eventId = it; page = "event_detail" },
                 modifier = Modifier.fillMaxSize(), contentPadding = screenPadding
@@ -291,7 +310,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
               vm, eventId,
               onAddSub = { subEventId = 0; page = "sub_form" },
               onEditSub = { subEventId = it; page = "sub_form" },
-              contentPadding = screenPadding
+              contentPadding = screenPadding, snapshot = displaySnapshot
             )
             "event_form" -> EventEditorScreen(
               vm, eventId.takeIf { it != 0 },
