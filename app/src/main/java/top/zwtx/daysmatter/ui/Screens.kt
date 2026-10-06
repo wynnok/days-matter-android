@@ -605,7 +605,7 @@ fun ConfirmDeleteDialog(title: String, body: String, onDismiss: () -> Unit, onCo
 @Composable
 fun ProfileScreen(
   vm: MainViewModel, onChannels: () -> Unit,
-  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}
+  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}, onLocalReminders: () -> Unit = {}
 ) {
   val profile = vm.snapshot?.profile
   var editing by remember(vm.session?.userId) { mutableStateOf(false) }
@@ -666,6 +666,8 @@ fun ProfileScreen(
       Text("设置", style = MaterialTheme.typography.titleMedium)
       GlassPanel {
         Column {
+          SettingsRow("本地提醒", "当前设备的通知、权限与测试", onLocalReminders)
+          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("站外提醒", "配置 Webhook 提醒渠道", onChannels)
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
           SettingsRow("导出数据", "保存账号 JSON 备份") { confirmingExport = true }

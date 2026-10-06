@@ -235,7 +235,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
       "sub_form" -> "event_detail"
       "channel_form" -> "channels"
       "event_detail" -> "home"
-      "channels", "help" -> "profile"
+      "channels", "help", "local_reminders" -> "profile"
       else -> "home"
     }
   }
@@ -250,6 +250,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
     "event_detail" -> "倒数日详情"
     "event_form" -> if (eventId == 0) "添加倒数日" else "编辑倒数日"
     "sub_form" -> if (subEventId == 0) "添加子事件" else "编辑子事件"
+    "local_reminders" -> "本地提醒"
     "channels" -> "站外提醒"
                     "help" -> "帮助与关于"
     "channel_form" -> if (channelId == 0) "添加渠道" else "编辑渠道"
@@ -325,6 +326,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               },
               onImport = { importFileOwner = vm.session; importLauncher.launch(arrayOf("application/json", "text/plain")) },
               onHelp = { page = "help" },
+              onLocalReminders = { page = "local_reminders" },
               contentPadding = screenPadding
             )
             "event_detail" -> EventDetailScreen(
@@ -346,6 +348,8 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               vm, eventId, subEventId.takeIf { it != 0 },
               onSaved = { page = "event_detail" }, contentPadding = screenPadding
             )
+            "local_reminders" -> top.zwtx.daysmatter.ui.LocalReminderScreen(vm,
+              onConfigure = { eventId = it; page = "event_form" }, contentPadding = screenPadding)
             "help" -> HelpScreen(screenPadding)
             "channels" -> ChannelListScreen(
               vm, onAdd = { channelId = 0; page = "channel_form" },
