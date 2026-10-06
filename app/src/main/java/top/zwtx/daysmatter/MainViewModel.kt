@@ -7,10 +7,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import top.zwtx.daysmatter.data.ApiException
+import top.zwtx.daysmatter.data.ApiClient
 import top.zwtx.daysmatter.data.AppearanceMode
 import top.zwtx.daysmatter.data.AppRepository
 import top.zwtx.daysmatter.data.LocalReminder
 import top.zwtx.daysmatter.data.LocalStore
+import top.zwtx.daysmatter.data.Profile
 import top.zwtx.daysmatter.data.Session
 import top.zwtx.daysmatter.data.Snapshot
 import top.zwtx.daysmatter.reminder.ReminderScheduler
@@ -18,9 +20,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.IOException
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
+class MainViewModel(application: Application, api: ApiClient) : AndroidViewModel(application) {
+  constructor(application: Application) : this(application, ApiClient())
   val store = LocalStore(application)
-  private val repository = AppRepository(store)
+  private val repository = AppRepository(store, api)
   private val scheduler = ReminderScheduler(application, store)
 
   var session by mutableStateOf(store.loadSession())
@@ -30,6 +33,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
   var busy by mutableStateOf(false)
     private set
   var testingChannel by mutableStateOf(false)
+    private set
+  var savingProfile by mutableStateOf(false)
     private set
   var refreshing by mutableStateOf(false)
     private set
@@ -160,11 +165,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     syncFailed = false
     busy = false
     testingChannel = false
+    savingProfile = false
     refreshing = false
   }
 
   fun localReminder(eventId: Int): LocalReminder =
     session?.let { store.localReminder(it.userId, eventId) } ?: LocalReminder()
+
+  fun saveProfile(nickname: String, email: String, onSaved: () -> Unit) {
+    val current = session ?: return
+    if (busy) return
+    viewModelScope.launch {
+      busy = true
+      savingProfile = true
+      var saved = false
+      try {
+        val data = repository.write(current, "PUT", "/user/info",
+          JSONObject().put("nickname", nickname.trim()).put("email", email.trim()))
+        if (session !== current) return@launch
+        saved = true
+        snapshot = snapshot?.let {
+          it.copy(profile = Profile.fromJson(data), raw = JSONObject(it.raw.toString()).put("profile", data))
+        }
+        message = "资料保存成功"
+        onSaved()
+        snapshot?.let { store.saveSnapshot(current.userId, it) }
+        load(current)
+      } catch (error: Exception) {
+        if (session === current && saved) {
+          if (error is ApiException && error.code == 401) {
+            logout()
+            message = "资料已保存，登录已失效，请重新登录"
+          } else {
+            offline = error is IOException
+            syncFailed = true
+            message = "资料已保存，但同步失败，请稍后刷新"
+          }
+        } else {
+          report(error, current)
+        }
+      } finally {
+        if (session === current) {
+          busy = false
+          savingProfile = false
+        }
+      }
+    }
+  }
 
   fun saveEvent(eventId: Int?, body: JSONObject, reminder: LocalReminder, onDone: (Int) -> Unit) {
     val current = session ?: return

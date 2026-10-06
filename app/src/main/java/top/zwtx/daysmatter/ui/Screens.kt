@@ -597,7 +597,7 @@ fun ProfileScreen(
   onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues
 ) {
   val profile = vm.snapshot?.profile
-  var editing by remember { mutableStateOf(false) }
+  var editing by remember(vm.session?.userId) { mutableStateOf(false) }
   var choosingAppearance by remember { mutableStateOf(false) }
   var nickname by remember(profile?.nickname) { mutableStateOf(profile?.nickname.orEmpty()) }
   var email by remember(profile?.email) { mutableStateOf(profile?.email.orEmpty()) }
@@ -640,7 +640,7 @@ fun ProfileScreen(
               color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
               overflow = TextOverflow.Ellipsis)
           }
-          TextButton(onClick = { editing = true }) { Text("编辑") }
+          TextButton(onClick = { editing = true }, enabled = profile != null && !vm.busy) { Text("编辑") }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant,
           modifier = Modifier.padding(vertical = AppDimens.itemGap))
@@ -669,14 +669,14 @@ fun ProfileScreen(
   }
   if (editing) {
     AlertDialog(
-      onDismissRequest = { editing = false },
+      onDismissRequest = { if (!vm.savingProfile) editing = false },
       title = { Text("编辑资料") },
       text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedTextField(nickname, { nickname = it }, label = { FormFieldLabel("昵称", required = true) },
-            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(), enabled = !vm.savingProfile)
           OutlinedTextField(email, { email = it }, label = { FormFieldLabel("邮箱", required = true) },
-            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+            shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(), enabled = !vm.savingProfile)
         }
       },
       confirmButton = {
@@ -684,12 +684,11 @@ fun ProfileScreen(
           if (nickname.isBlank() || email.isBlank()) {
             vm.showMessage("昵称和邮箱不能为空")
           } else {
-            vm.write("PUT", "/user/info", JSONObject().put("nickname", nickname.trim()).put("email", email.trim()))
-            editing = false
+            vm.saveProfile(nickname, email) { editing = false }
           }
-        }) { Text("保存") }
+        }, enabled = !vm.busy) { Text(if (vm.savingProfile) "保存中…" else "保存") }
       },
-      dismissButton = { TextButton(onClick = { editing = false }) { Text("取消") } }
+      dismissButton = { TextButton(onClick = { editing = false }, enabled = !vm.savingProfile) { Text("取消") } }
     )
   }
   if (choosingAppearance) {
