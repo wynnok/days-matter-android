@@ -3,6 +3,7 @@ package top.zwtx.daysmatter
 import android.os.Bundle
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -83,9 +84,16 @@ import java.time.Instant
 class MainActivity : ComponentActivity() {
   private lateinit var appViewModel: MainViewModel
   private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-    override fun onAvailable(network: Network) {
+    override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+      val available = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+      runOnUiThread { if (::appViewModel.isInitialized) appViewModel.networkChanged(available) }
+    }
+    override fun onLost(network: Network) {
       runOnUiThread {
-        if (::appViewModel.isInitialized && appViewModel.offline) appViewModel.refresh()
+        val connectivity = getSystemService(ConnectivityManager::class.java)
+        val available = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+          ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+        if (::appViewModel.isInitialized) appViewModel.networkChanged(available)
       }
     }
   }
@@ -102,6 +110,11 @@ class MainActivity : ComponentActivity() {
       val vm: MainViewModel = viewModel()
       appViewModel = vm
       LaunchedEffect(vm) { vm.openEvent(intent) }
+      LaunchedEffect(vm) {
+        val connectivity = getSystemService(ConnectivityManager::class.java)
+        vm.networkChanged(connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+          ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true)
+      }
       val systemDark = isSystemInDarkTheme()
       val dark = when (vm.appearanceMode) {
         AppearanceMode.LIGHT -> false
@@ -125,6 +138,15 @@ class MainActivity : ComponentActivity() {
     super.onStart()
     val connectivity = getSystemService(ConnectivityManager::class.java)
     connectivity.registerDefaultNetworkCallback(networkCallback)
+    if (::appViewModel.isInitialized) appViewModel.networkChanged(
+      connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+        ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+    )
+  }
+
+  override fun onResume() {
+    super.onResume()
+    if (::appViewModel.isInitialized) appViewModel.refreshIfNeeded()
   }
 
   override fun onStop() {
@@ -139,6 +161,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
   val lifecycle = LocalLifecycleOwner.current.lifecycle
   val displayInstant by produceState(Instant.now(), lifecycle) {
     lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+      vm.refreshIfNeeded()
       while (true) {
         value = Instant.now()
         delay(30_000)

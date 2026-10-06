@@ -26,8 +26,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.IOException
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 
-class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clock.systemUTC()) : AndroidViewModel(application) {
+class MainViewModel(application: Application, api: ApiClient, private val clock: Clock = Clock.systemUTC()) : AndroidViewModel(application) {
   constructor(application: Application) : this(application, ApiClient())
   val store = LocalStore(application)
   private val repository = AppRepository(store, api, clock)
@@ -118,6 +120,41 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     store.setAppearanceMode(mode)
   }
 
+  private var networkAvailable: Boolean? = null
+  private var pendingNetworkRecovery = false
+
+  fun networkChanged(available: Boolean) {
+    val recovering = networkAvailable == false || offline || syncFailed
+    networkAvailable = available
+    if (!available) offline = true
+    else if (busy && recovering) pendingNetworkRecovery = true
+    else refreshIfNeeded()
+  }
+
+  fun refreshIfNeeded() {
+    if (session == null || busy || networkAvailable == false) return
+    val cached = snapshot
+    val today = clock.instant().atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()
+    val fetchedDate = cached?.syncedAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.of("Asia/Shanghai")).toLocalDate() }
+    if (cached == null || offline || syncFailed || fetchedDate != today ||
+      clock.millis() - cached.syncedAt >= 60_000 || cached.syncedAt > clock.millis()) refresh()
+  }
+
+  private fun completeOperation(owner: Session?) {
+    if (session !== owner) return
+    busy = false
+    if (pendingNetworkRecovery) {
+      pendingNetworkRecovery = false
+      refreshIfNeeded()
+    }
+  }
+
+  private fun requireNetwork(): Boolean {
+    if (networkAvailable != false) return true
+    message = "当前离线，此操作需要联网；输入已保留，请联网后再提交"
+    return false
+  }
+
   private fun report(error: Exception, requestedSession: Session? = null) {
     if (requestedSession != null && session !== requestedSession) return
     if (error is ApiException && error.code == 401 && requestedSession != null) {
@@ -134,7 +171,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     if (this.session !== session) return
     snapshot = refreshed
     scheduler.reschedule(session.userId, refreshed)
-    offline = false
+    offline = networkAvailable == false
     syncFailed = false
     resolveEventTarget(confirmed = true)
   }
@@ -168,7 +205,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       } finally {
         if (session === current) {
           refreshing = false
-          busy = false
+          completeOperation(current)
           resolveEventTarget(failed = offline || syncFailed)
         }
       }
@@ -194,7 +231,8 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         syncFailed = current != null && (error !is ApiException || error.code != 401)
         report(error, current)
       } finally {
-        if (session === authenticated) { busy = false; resolveEventTarget(failed = offline || syncFailed) }
+        if (session === authenticated) completeOperation(authenticated)
+        resolveEventTarget(failed = offline || syncFailed)
       }
     }
   }
@@ -218,7 +256,8 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         syncFailed = current != null && (error !is ApiException || error.code != 401)
         report(error, current)
       } finally {
-        if (session === authenticated) { busy = false; resolveEventTarget(failed = offline || syncFailed) }
+        if (session === authenticated) completeOperation(authenticated)
+        resolveEventTarget(failed = offline || syncFailed)
       }
     }
   }
@@ -242,6 +281,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     testingChannel = false
     savingProfile = false
     refreshing = false
+    pendingNetworkRecovery = false
   }
 
   fun localReminder(eventId: Int): LocalReminder =
@@ -250,6 +290,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
   fun saveProfile(nickname: String, email: String, onSaved: () -> Unit) {
     val current = session ?: return
     if (busy) return
+    if (!requireNetwork()) return
     viewModelScope.launch {
       busy = true
       savingProfile = true
@@ -270,8 +311,8 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         if (saved) reportAfterWrite(error, current, "资料已保存") else report(error, current)
       } finally {
         if (session === current) {
-          busy = false
           savingProfile = false
+          completeOperation(current)
         }
       }
     }
@@ -280,6 +321,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
   fun saveEvent(eventId: Int?, body: JSONObject, reminder: LocalReminder, onDone: (Int) -> Unit) {
     val current = session ?: return
     if (busy) return
+    if (!requireNetwork()) return
     viewModelScope.launch {
       busy = true
       var saved = false
@@ -296,9 +338,15 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         store.saveLocalReminder(current.userId, id, reminder)
         load(current)
       } catch (error: Exception) {
-        if (saved) reportAfterWrite(error, current, "保存成功") else report(error, current)
+        if (saved) reportAfterWrite(error, current, "保存成功") else {
+          report(error, current)
+          if (session === current && error is IOException) {
+            offline = true
+            message = "网络连接失败，保存需要联网；输入已保留，请联网后核实数据"
+          }
+        }
       } finally {
-        if (session === current) busy = false
+        if (session === current) completeOperation(current)
       }
     }
   }
@@ -333,6 +381,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
   ) {
     val current = session ?: return
     if (busy) return
+    if (!requireNetwork()) return
     viewModelScope.launch {
       busy = true
       var written = false
@@ -350,9 +399,15 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
         }
         load(current)
       } catch (error: Exception) {
-        if (written) reportAfterWrite(error, current, successMessage) else report(error, current)
+        if (written) reportAfterWrite(error, current, successMessage) else {
+          report(error, current)
+          if (session === current && error is IOException) {
+            offline = true
+            message = "网络连接失败，操作需要联网；输入已保留，请联网后核实数据"
+          }
+        }
       } finally {
-        if (session === current) busy = false
+        if (session === current) completeOperation(current)
       }
     }
   }
@@ -360,6 +415,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
   fun testChannel(body: JSONObject) {
     val current = session ?: return
     if (busy) return
+    if (!requireNetwork()) return
     viewModelScope.launch {
       busy = true
       testingChannel = true
@@ -371,7 +427,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       } finally {
         if (session === current) {
           testingChannel = false
-          busy = false
+          completeOperation(current)
         }
       }
     }
@@ -399,6 +455,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
   fun exportData(onReady: (String) -> Unit) {
     val current = session ?: return
     if (busy) return
+    if (!requireNetwork()) return
     viewModelScope.launch {
       busy = true
       try {
@@ -407,7 +464,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
       } catch (error: Exception) {
         report(error, current)
       } finally {
-        if (session === current) busy = false
+        if (session === current) completeOperation(current)
       }
     }
   }
@@ -469,7 +526,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
           if (session === current) message = if (unknown) "导入结果未知，刷新失败，请稍后核实账号数据" else "导入请求已完成，但刷新失败，请仅刷新账号数据"
         }
       } finally {
-        if (session === current) { busy = false; refreshing = false }
+        if (session === current) { refreshing = false; completeOperation(current) }
       }
     }
   }
@@ -478,6 +535,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
     val current = importOwner ?: return
     val preview = importPreview ?: return
     if (session !== current || busy) return
+    if (!requireNetwork()) return
     viewModelScope.launch {
       busy = true
       var written = false
@@ -512,7 +570,7 @@ class MainViewModel(application: Application, api: ApiClient, clock: Clock = Clo
           message = "导入结果未知，可能已追加，请先刷新并核实数据，避免重复导入"
         }
       } finally {
-        if (session === current) busy = false
+        if (session === current) completeOperation(current)
       }
     }
   }
