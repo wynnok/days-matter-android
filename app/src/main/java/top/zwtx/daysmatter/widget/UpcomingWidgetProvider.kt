@@ -73,12 +73,15 @@ class UpcomingWidgetProvider : AppWidgetProvider() {
       }
       click(R.id.upcoming_title, open, 0)
       click(R.id.upcoming_all, open, 0)
+      // The title keeps the home action at minimum height; avoid a duplicate footer crowding the three rows.
+      views.setViewVisibility(R.id.upcoming_all, if (height >= 180) View.VISIBLE else View.GONE)
       val labels = mutableListOf<String>()
       rows.forEachIndexed { index, row ->
         val event = upcoming.getOrNull(index).takeIf { index < limit }
-        val text = event?.let { "${it.nextOccurrence?.substring(5)?.replace('-', '/')} · ${it.name} · ${if (it.daysDiff == 0) "今天" else "还有 ${it.daysDiff} 天"}" }
+        val text = event?.let { "${it.nextOccurrence?.substring(5)?.replace('-', '/')} · ${if (it.daysDiff == 0) "今天" else "还有 ${it.daysDiff} 天"} · ${it.name}" }
           ?: if (index == 0) message else ""
         labels.add(text)
+        views.setInt(row, "setMaxLines", if (height < 240) 1 else 2)
         views.setTextViewText(row, text)
         views.setViewVisibility(row, if (text.isNotBlank()) View.VISIBLE else View.GONE)
         click(row, event?.let { EventTarget(binding!!.backend, binding.userId, it.id).intent(context) } ?: open, index + 1)

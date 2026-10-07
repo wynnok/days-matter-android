@@ -5,6 +5,10 @@ import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.os.Looper
 import android.widget.TextView
+import kotlinx.coroutines.runBlocking
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import org.json.JSONObject
 import org.junit.*
@@ -96,6 +100,40 @@ class WidgetSyncIntegrationTest {
     assertEquals("目标事件", text(R.id.widget_name))
     assertTrue(text(R.id.widget_status).contains("同步失败，显示缓存"))
     assertTrue(text(R.id.widget_status).contains("上次同步"))
+  }
+
+  @Test fun unrelatedExportPreservesBackgroundFailureUntilConfirmedAccountRecovery() {
+    val before = vm.store.loadSnapshot(7)!!.syncedAt
+    server.failEvents = true
+    runBlocking {
+      assertFalse(WidgetSyncJobService.synchronize(app, ApiClient(server.baseUrl),
+        Clock.fixed(Instant.ofEpochMilli(before).plusSeconds(7200), ZoneOffset.UTC)))
+    }
+    assertTrue(text(R.id.widget_status).contains("同步失败"))
+    compose.runOnIdle { vm.exportData {} }
+    waitForRequest()
+    assertTrue("导出没有获取新的账号数据，不能清除后台失败", text(R.id.widget_status).contains("同步失败"))
+    assertTrue(shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_status).text.contains("同步失败"))
+    assertEquals(before, vm.store.loadSnapshot(7)!!.syncedAt)
+    server.failEvents = false
+    server.events.getJSONObject(0).put("event_name", "真正恢复后的事件")
+    compose.runOnIdle { vm.refreshIfNeeded() }
+    waitForRequest()
+    assertEquals("真正恢复后的事件", text(R.id.widget_name))
+    assertFalse(text(R.id.widget_status).contains("同步失败"))
+  }
+
+  @Test fun closingForegroundOwnerDoesNotInventADesktopSyncFailure() {
+    val lifecycle = androidx.lifecycle.ViewModelStore().apply { put("account", vm) }
+    val requestsBefore = server.eventRequests.get()
+    server.eventsPaused = java.util.concurrent.CountDownLatch(1)
+    compose.runOnIdle { vm.refresh() }
+    compose.waitUntil(5_000) { server.eventRequests.get() > requestsBefore }
+    compose.runOnIdle { lifecycle.clear() }
+    server.eventsPaused.countDown()
+    waitForRequest()
+    assertFalse("正常结束前台读取不是账号同步失败", text(R.id.widget_status).contains("同步失败"))
+    assertFalse(shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_status).text.contains("同步失败"))
   }
 
   @Test fun successfulSyncUpdatesDesktopAndPermissionDenialDoesNotHideIt() {

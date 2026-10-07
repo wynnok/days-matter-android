@@ -2,6 +2,8 @@ package top.zwtx.daysmatter.data
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** Share overlapping reads, but never accept a read from before a mutation finished. */
 internal object SnapshotRequests {
@@ -31,7 +33,11 @@ internal object SnapshotRequests {
         result.exceptionOrNull()?.let { request.completeExceptionally(it) }
         synchronized(lock) { pending.remove(key) }
       }
-      result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
+      if (result.exceptionOrNull() is CancellationException) {
+        // A stopped background owner must not cancel another active caller sharing its read.
+        currentCoroutineContext().ensureActive()
+        continue
+      }
       if (synchronized(lock) { key.generation == (generations[account] ?: 0L) }) return result.getOrThrow()
       // A write completed while this read was pending. Read the new generation instead.
     }

@@ -53,8 +53,8 @@ class UpcomingWidgetTest {
     UpcomingWidgetProvider.update(app, id, now)
     val view = shadowOf(manager).getViewFor(id)
     assertEquals("10/07 · 今天 · 今天", view.findViewById<TextView>(R.id.upcoming_row_1).text.toString())
-    assertEquals("10/13 · Z置顶 · 还有 6 天", view.findViewById<TextView>(R.id.upcoming_row_2).text.toString())
-    assertEquals("10/13 · A普通 · 还有 6 天", view.findViewById<TextView>(R.id.upcoming_row_3).text.toString())
+    assertEquals("10/13 · 还有 6 天 · Z置顶", view.findViewById<TextView>(R.id.upcoming_row_2).text.toString())
+    assertEquals("10/13 · 还有 6 天 · A普通", view.findViewById<TextView>(R.id.upcoming_row_3).text.toString())
     assertTrue(view.findViewById<TextView>(R.id.upcoming_status).text.contains("1 个日期待同步"))
     view.findViewById<TextView>(R.id.upcoming_row_2).performClick()
     val opened = shadowOf(app).nextStartedActivity
@@ -65,7 +65,7 @@ class UpcomingWidgetTest {
     manager.updateAppWidgetOptions(id, android.os.Bundle().apply { putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 400) })
     WidgetStore(app).saveUpcoming(id, UpcomingBinding(BuildConfig.API_BASE_URL, 7, 30, 1))
     UpcomingWidgetProvider.update(app, id, now)
-    assertEquals("11/05 · 三十天边界 · 还有 29 天", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_row_5).text.toString())
+    assertEquals("11/05 · 还有 29 天 · 三十天边界", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_row_5).text.toString())
     assertFalse(shadowOf(manager).getViewFor(id).contentDescription.toString().contains("远期置顶"))
   }
   @Test fun deletedCategoryRequiresReselectionAndNeverChangesImportantDayBinding() {
@@ -85,6 +85,58 @@ class UpcomingWidgetTest {
     UpcomingWidgetProvider.update(app, id, now)
     assertEquals("请登录所属账号或重新配置", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_row_1).text.toString())
     assertFalse(shadowOf(manager).getViewFor(id).contentDescription.toString().contains("今天"))
+  }
+
+  @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+  fun longNamesNeverEllipsizeConfirmedDateOrCountdownAtMinimumSize() {
+    seed()
+    val raw = LocalStore(app).loadSnapshot(7)!!.raw
+    raw.getJSONArray("events").getJSONObject(1).put("event_name", "很长的合法事件名称".repeat(10))
+    raw.getJSONArray("events").getJSONObject(2).put("event_name", "另一个很长的事件名称".repeat(9))
+    LocalStore(app).saveSnapshot(7, Snapshot.fromJson(raw))
+    val id = allocate()
+    WidgetStore(app).saveUpcoming(id, UpcomingBinding(BuildConfig.API_BASE_URL, 7))
+    RuntimeEnvironment.setFontScale(1.5f)
+    shadowOf(manager).setAlwaysRecreateViewsDuringUpdate(true)
+    for ((width, height) in listOf(250 to 160, 280 to 180, 320 to 360)) {
+      manager.updateAppWidgetOptions(id, android.os.Bundle().apply {
+        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, width)
+        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, height)
+      })
+      UpcomingWidgetProvider.update(app, id, now)
+      val view = shadowOf(manager).getViewFor(id)
+      view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY),
+        android.view.View.MeasureSpec.makeMeasureSpec(height, android.view.View.MeasureSpec.EXACTLY))
+      view.layout(0, 0, width, height)
+      listOf(R.id.upcoming_row_1 to "今天", R.id.upcoming_row_2 to "还有 6 天").forEach { (rowId, countdown) ->
+        val row = view.findViewById<TextView>(rowId)
+        val content = row.text.toString()
+        assertTrue("日程不能绘制被裁切的半行", row.layout.getLineBottom(row.layout.lineCount - 1) <= row.height)
+        val namePrefix = if (rowId == R.id.upcoming_row_1) "很长" else "另一个"
+        listOf(content.substring(0, 5), countdown, namePrefix).forEach { required ->
+          val start = content.indexOf(required)
+          assertTrue(start >= 0)
+          val end = start + required.length
+          val line = row.layout.getLineForOffset(end - 1)
+          assertTrue("$width × $height：$required 必须可见（行底=${row.layout.getLineBottom(line)}，高度=${row.height}，字体=${row.textSize}）", row.layout.getLineBottom(line) <= row.height)
+          val cutoff = row.layout.getLineStart(line) + row.layout.getEllipsisStart(line)
+          assertTrue("长名称不能挤掉 $required", row.layout.getEllipsisCount(line) == 0 || end <= cutoff)
+        }
+        assertTrue(row.performClick())
+        assertEquals(if (rowId == R.id.upcoming_row_1) 2 else 3,
+          shadowOf(app).nextStartedActivity.getIntExtra("event_id", 0))
+      }
+      val title = view.findViewById<TextView>(R.id.upcoming_title)
+      assertTrue(title.layout.getLineBottom(0) <= title.height)
+      assertTrue(title.performClick())
+      assertEquals(0, shadowOf(app).nextStartedActivity.getIntExtra("category_id", -1))
+      val output = java.io.File("build/widget-previews").apply { mkdirs() }
+      val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+      view.draw(android.graphics.Canvas(bitmap))
+      java.io.File(output, "upcoming-long-name-${width}x${height}.png").outputStream().use {
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+      }
+    }
   }
 
   @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)

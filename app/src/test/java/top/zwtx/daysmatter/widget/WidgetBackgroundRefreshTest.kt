@@ -101,6 +101,25 @@ class WidgetBackgroundRefreshTest {
     assertEquals("请登录所属账号或重新配置", text(fixed, R.id.widget_days))
     assertEquals("请登录所属账号或重新配置", text(recent, R.id.upcoming_row_1))
   }
+  @Test(timeout = 20_000) fun stoppedBackgroundSyncDoesNotCancelForegroundAccountRefresh() = runBlocking {
+    server.eventsPaused = java.util.concurrent.CountDownLatch(1)
+    val api = ApiClient(server.baseUrl)
+    val clock = Clock.fixed(now, ZoneOffset.UTC)
+    val background = async { WidgetSyncJobService.synchronize(app, api, clock) }
+    withContext(Dispatchers.IO) { assertTrue(server.eventsStarted.await(5, java.util.concurrent.TimeUnit.SECONDS)) }
+    val foreground = async { AppRepository(store, api, clock).refresh(store.loadSession()!!) }
+    yield()
+    background.cancel()
+    server.eventsPaused.countDown()
+    background.join()
+    val confirmed = foreground.await()
+    store.saveSnapshot(7, confirmed)
+    WidgetUpdates.redraw(app, now)
+    assertEquals("目标事件", text(fixed, R.id.widget_name))
+    assertTrue(text(recent, R.id.upcoming_row_1).contains("目标事件"))
+    assertEquals(now.toEpochMilli(), confirmed.syncedAt)
+  }
+
   @Test(timeout = 20_000) fun offlineRedrawLeavesExpiredRepeatPendingAndNeverCreatesAnotherOccurrence() {
     val raw = store.loadSnapshot(7)!!.raw
     raw.getJSONArray("events").getJSONObject(0).put("repeat_type", 4)

@@ -6,6 +6,7 @@ import top.zwtx.daysmatter.data.BackupDocuments
 import top.zwtx.daysmatter.data.BackupPreview
 import top.zwtx.daysmatter.data.ImportOutcome
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,8 @@ import top.zwtx.daysmatter.data.Session
 import top.zwtx.daysmatter.data.Snapshot
 import top.zwtx.daysmatter.data.withSavedEvent
 import top.zwtx.daysmatter.data.withDeletedEvent
+import top.zwtx.daysmatter.widget.WidgetStore
+import top.zwtx.daysmatter.widget.WidgetSyncState
 import top.zwtx.daysmatter.reminder.ReminderScheduler
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -168,6 +171,13 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   fun refreshIfNeeded() {
     val current = session
     if (current != null && store.loadSession() == null) { logout(); return }
+    current?.let {
+      when (WidgetStore(getApplication<Application>()).syncState(it.userId)) {
+        WidgetSyncState.OFFLINE -> offline = true
+        WidgetSyncState.FAILED -> syncFailed = true
+        WidgetSyncState.CACHED -> Unit
+      }
+    }
     val disk = current?.let { store.loadSnapshot(it.userId) }
     if (disk != null && disk.syncedAt > (snapshot?.syncedAt ?: 0)) {
       snapshot = disk
@@ -185,9 +195,14 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
 
   private fun updateWidgets() {
     val context = getApplication<Application>()
+    val widgets = WidgetStore(context)
     session?.let {
-      top.zwtx.daysmatter.widget.WidgetStore(context).recordSyncState(it.userId,
-        when { offline -> top.zwtx.daysmatter.widget.WidgetSyncState.OFFLINE; syncFailed -> top.zwtx.daysmatter.widget.WidgetSyncState.FAILED; else -> top.zwtx.daysmatter.widget.WidgetSyncState.CACHED })
+      val status = when {
+        offline -> WidgetSyncState.OFFLINE
+        syncFailed -> WidgetSyncState.FAILED
+        else -> widgets.syncState(it.userId) // Redrawing alone cannot clear a known background failure.
+      }
+      widgets.recordSyncState(it.userId, status)
     }
     top.zwtx.daysmatter.widget.WidgetUpdates.redraw(context, clock.instant())
     top.zwtx.daysmatter.widget.WidgetRefreshScheduler.ensureScheduled(context)
@@ -229,6 +244,8 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
     scheduler.reschedule(session.userId, refreshed)
     offline = networkAvailable == false
     syncFailed = false
+    WidgetStore(getApplication<Application>()).recordSyncState(session.userId,
+      WidgetSyncState.CACHED)
     updateWidgets()
     resolveEventTarget(confirmed = true)
   }
@@ -253,6 +270,8 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
       refreshing = true
       try {
         load(current)
+      } catch (error: CancellationException) {
+        throw error
       } catch (error: Exception) {
         if (session === current) {
           offline = error is IOException
