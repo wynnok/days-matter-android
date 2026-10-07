@@ -40,7 +40,8 @@ class ImportantDayWidgetProvider : AppWidgetProvider() {
       .setData(android.net.Uri.parse("daysmatter://widget/configure/$id"))
 
     fun render(context: Context, id: Int, now: Instant = Instant.now(),
-      target: EventTarget? = WidgetStore(context).binding(id)): RemoteViews {
+      target: EventTarget? = WidgetStore(context).binding(id),
+      appearance: top.zwtx.daysmatter.data.AppearanceMode = WidgetStore(context).appearance(id)): RemoteViews {
       val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(id)
       val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160)
       val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160)
@@ -111,6 +112,7 @@ class ImportantDayWidgetProvider : AppWidgetProvider() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
       views.setOnClickPendingIntent(R.id.widget_root, pending)
       views.setContentDescription(R.id.widget_root, listOf(name, days, date, category, status).filter { it.isNotBlank() }.joinToString("，"))
+      views.applyWidgetAppearance(appearance, intArrayOf(R.id.widget_name, R.id.widget_days, R.id.widget_date, R.id.widget_category, R.id.widget_status))
       return views
     }
   }

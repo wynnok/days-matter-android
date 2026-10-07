@@ -37,7 +37,8 @@ class UpcomingWidgetProvider : AppWidgetProvider() {
         putExtra("widget_home", true); putExtra("backend", binding.backend.trimEnd('/')); putExtra("user_id", binding.userId)
         putExtra("category_id", binding.categoryId); putExtra("create_event", create); putExtra("widget_refresh", refresh)
       }
-    fun render(context: Context, id: Int, now: Instant = Instant.now(), binding: UpcomingBinding? = WidgetStore(context).upcoming(id)): RemoteViews {
+    fun render(context: Context, id: Int, now: Instant = Instant.now(), binding: UpcomingBinding? = WidgetStore(context).upcoming(id),
+      appearance: top.zwtx.daysmatter.data.AppearanceMode = WidgetStore(context).appearance(id)): RemoteViews {
       val views = RemoteViews(context.packageName, R.layout.upcoming_widget)
       val store = LocalStore(context)
       val session = store.loadSession()
@@ -94,6 +95,7 @@ class UpcomingWidgetProvider : AppWidgetProvider() {
         click(R.id.upcoming_refresh, homeIntent(context, binding, refresh = true), 7)
       }
       views.setContentDescription(R.id.widget_root, (listOf(if (owned && !deleted) title else "近期日程") + labels + status).filter { it.isNotBlank() }.joinToString("，"))
+      views.applyWidgetAppearance(appearance, rows + intArrayOf(R.id.upcoming_title, R.id.upcoming_status, R.id.upcoming_all, R.id.upcoming_add, R.id.upcoming_refresh))
       return views
     }
   }

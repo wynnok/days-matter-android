@@ -23,6 +23,7 @@ import top.zwtx.daysmatter.BuildConfig
 import top.zwtx.daysmatter.EventTarget
 import top.zwtx.daysmatter.MainActivity
 import top.zwtx.daysmatter.data.LocalStore
+import top.zwtx.daysmatter.data.AppearanceMode
 import top.zwtx.daysmatter.ui.DaysMatterTheme
 
 class WidgetConfigurationActivity : ComponentActivity() {
@@ -54,6 +55,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
       var categoryId by rememberSaveable { mutableIntStateOf(
         if (originalUpcoming?.userId == session?.userId && originalUpcoming?.backend == BuildConfig.API_BASE_URL.trimEnd('/')) originalUpcoming.categoryId else 0) }
       var ownerId by rememberSaveable { mutableIntStateOf(session?.userId ?: 0) }
+      var appearance by rememberSaveable { mutableStateOf(widgets.appearance(id)) }
       var error by remember { mutableStateOf<String?>(null) }
       LaunchedEffect(session?.userId) {
         if (ownerId != (session?.userId ?: 0)) { selected = 0; categoryId = 0; ownerId = session?.userId ?: 0 }
@@ -87,13 +89,22 @@ class WidgetConfigurationActivity : ComponentActivity() {
                 }
               }
             }
+            Text("实例外观", style = MaterialTheme.typography.titleMedium)
+            AppearanceMode.entries.forEach { mode ->
+              val label = when (mode) { AppearanceMode.SYSTEM -> "跟随系统"; AppearanceMode.LIGHT -> "浅色"; AppearanceMode.DARK -> "深色" }
+              Row(Modifier.fillMaxWidth().selectable(appearance == mode, role = Role.RadioButton,
+                onClick = { appearance = mode }).padding(vertical = 4.dp)) {
+                RadioButton(appearance == mode, onClick = null)
+                Text(label, Modifier.padding(top = 12.dp))
+              }
+            }
             if (session != null && snapshot != null && (upcoming || (selected != 0 && snapshot.events.any { it.id == selected }))) {
               Text("桌面预览", style = MaterialTheme.typography.titleMedium)
               AndroidView(factory = { FrameLayout(it) }, modifier = Modifier.fillMaxWidth().height(180.dp), update = { frame ->
                 val preview = if (upcoming) UpcomingWidgetProvider.render(this@WidgetConfigurationActivity, id,
-                  binding = UpcomingBinding(BuildConfig.API_BASE_URL, session.userId, window, categoryId))
+                  binding = UpcomingBinding(BuildConfig.API_BASE_URL, session.userId, window, categoryId), appearance = appearance)
                 else ImportantDayWidgetProvider.render(this@WidgetConfigurationActivity, id,
-                  target = EventTarget(BuildConfig.API_BASE_URL.trimEnd('/'), session.userId, selected))
+                  target = EventTarget(BuildConfig.API_BASE_URL.trimEnd('/'), session.userId, selected), appearance = appearance)
                 frame.removeAllViews()
                 frame.addView(preview.apply(frame.context, frame))
               })
@@ -109,6 +120,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                 manager.getAppWidgetInfo(id)?.provider != provider) {
                 error = "账号或事件已变化，请重新选择"
               } else {
+                widgets.saveAppearance(id, appearance)
                 if (upcoming) {
                   widgets.saveUpcoming(id, UpcomingBinding(BuildConfig.API_BASE_URL, current.userId, window, categoryId))
                   UpcomingWidgetProvider.update(this@WidgetConfigurationActivity, id)

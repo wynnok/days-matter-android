@@ -3,6 +3,7 @@ package top.zwtx.daysmatter.widget
 import android.content.Context
 import org.json.JSONObject
 import top.zwtx.daysmatter.EventTarget
+import top.zwtx.daysmatter.data.AppearanceMode
 
 /** Widget configuration belongs to an individual device instance. */
 class WidgetStore(context: Context) {
@@ -19,7 +20,11 @@ class WidgetStore(context: Context) {
     preferences.edit().putString("upcoming_$id", JSONObject().put("backend", binding.backend.trimEnd('/'))
       .put("user_id", binding.userId).put("window", binding.window).put("category_id", binding.categoryId).toString()).apply()
   }
-  fun remove(id: Int) { preferences.edit().remove("instance_$id").remove("upcoming_$id").apply() }
+  fun appearance(id: Int): AppearanceMode = AppearanceMode.entries.firstOrNull {
+    it.name == preferences.getString("appearance_$id", null)
+  } ?: AppearanceMode.SYSTEM
+  fun saveAppearance(id: Int, mode: AppearanceMode) { preferences.edit().putString("appearance_$id", mode.name).apply() }
+  fun remove(id: Int) { preferences.edit().remove("instance_$id").remove("upcoming_$id").remove("appearance_$id").apply() }
   fun recordSyncState(userId: Int, status: String) { preferences.edit().putString("sync_$userId", status).apply() }
   fun syncState(userId: Int): String = preferences.getString("sync_$userId", "缓存") ?: "缓存"
 }

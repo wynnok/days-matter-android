@@ -256,4 +256,52 @@ class WidgetConfigurationFlowTest {
     assertEquals("近期 7 天 · 全部", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_title).text.toString())
   }
 
+  @Test fun perInstanceAppearanceSurvivesReconfigurationAndDoesNotChangeApplicationPreference() {
+    val light = allocate()
+    val dark = allocate()
+    val first = configure(light)
+    compose.onNodeWithText("第一个固定事件").performClick()
+    compose.onNodeWithText("浅色").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    first.pause().stop().destroy()
+    val second = configure(dark)
+    compose.onNodeWithText("第二个固定事件").performClick()
+    compose.onNodeWithText("深色").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    second.pause().stop().destroy()
+    val canceled = configure(light)
+    compose.onNodeWithText("深色").performScrollTo().performClick()
+    compose.onNodeWithText("取消").performScrollTo().performClick()
+    canceled.pause().stop().destroy()
+    RuntimeEnvironment.setQualifiers("w411dp-h891dp-night")
+    ImportantDayWidgetProvider.updateAll(app)
+    assertEquals(android.graphics.Color.parseColor("#292421"), shadowOf(manager).getViewFor(light).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    assertEquals(android.graphics.Color.parseColor("#FFF1E9"), shadowOf(manager).getViewFor(dark).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    assertEquals(top.zwtx.daysmatter.data.AppearanceMode.SYSTEM, store.appearanceMode())
+    assertEquals("第一个固定事件", renderedName(light))
+    assertEquals("第二个固定事件", renderedName(dark))
+  }
+
+  @Test fun recentInstanceThemeAndConfigurationRemainIndependentFromImportantDay() {
+    val fixed = allocate()
+    chooseAndSave(fixed, "第一个固定事件")
+    val recent = shadowOf(manager).createWidget(UpcomingWidgetProvider::class.java, R.layout.upcoming_widget)
+    shadowOf(manager).putWidgetInfo(recent, AppWidgetProviderInfo().apply { provider = ComponentName(app, UpcomingWidgetProvider::class.java) })
+    val controller = configure(recent)
+    compose.onNodeWithText("深色").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    controller.pause().stop().destroy()
+    RuntimeEnvironment.setQualifiers("w411dp-h891dp-notnight")
+    ImportantDayWidgetProvider.updateAll(app)
+    UpcomingWidgetProvider.updateAll(app)
+    assertEquals(android.graphics.Color.parseColor("#FFF1E9"), shadowOf(manager).getViewFor(recent).findViewById<TextView>(R.id.upcoming_title).currentTextColor)
+    assertEquals(android.graphics.Color.parseColor("#292421"), shadowOf(manager).getViewFor(fixed).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    RuntimeEnvironment.setQualifiers("w411dp-h891dp-night")
+    ImportantDayWidgetProvider.updateAll(app)
+    UpcomingWidgetProvider.updateAll(app)
+    assertEquals(android.graphics.Color.parseColor("#FFF1E9"), shadowOf(manager).getViewFor(fixed).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    assertEquals("第一个固定事件", renderedName(fixed))
+    assertEquals("近期 30 天 · 全部", shadowOf(manager).getViewFor(recent).findViewById<TextView>(R.id.upcoming_title).text.toString())
+  }
+
 }

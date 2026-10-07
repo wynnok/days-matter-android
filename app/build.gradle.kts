@@ -37,9 +37,12 @@ android {
 
   testOptions.unitTests.isIncludeAndroidResources = true
   testOptions.unitTests.all {
-    val testHome = rootProject.file(".tools/test-home")
+    // API 36's native resource loader cannot decode an escaped Unicode artifact path.
+    val testHome = gradle.gradleUserHomeDir.resolve("days-matter-test-home")
     val testTemp = rootProject.file(".tools/test-temp")
     it.systemProperty("user.home", testHome.path)
+    // Robolectric's API 36 FileDescriptor interceptor uses this JDK bridge.
+    it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
     it.systemProperty("java.io.tmpdir", testTemp.path)
     it.doFirst {
       testHome.mkdirs()
