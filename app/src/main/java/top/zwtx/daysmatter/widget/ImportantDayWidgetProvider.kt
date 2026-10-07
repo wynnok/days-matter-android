@@ -22,11 +22,13 @@ import java.time.format.DateTimeFormatter
 class ImportantDayWidgetProvider : AppWidgetProvider() {
   override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
     ids.forEach { update(context, it) }
+    WidgetRefreshScheduler.requestNetwork(context)
   }
   override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) {
     update(context, id)
   }
   override fun onDeleted(context: Context, ids: IntArray) { ids.forEach { WidgetStore(context).remove(it) } }
+  override fun onDisabled(context: Context) { WidgetRefreshScheduler.ensureScheduled(context) }
 
   companion object {
     fun instanceIds(context: Context): IntArray = AppWidgetManager.getInstance(context)
@@ -98,7 +100,7 @@ class ImportantDayWidgetProvider : AppWidgetProvider() {
           val syncTime = if (snapshot.syncedAt > 0) Instant.ofEpochMilli(snapshot.syncedAt)
             .atZone(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.ofPattern(if (compact || small) "MM-dd HH:mm" else "yyyy-MM-dd HH:mm"))
             else "尚未获取"
-          status = "${WidgetStore(context).syncState(session.userId)} · 上次同步 $syncTime"
+          status = "${WidgetStore(context).syncState(session.userId).label} · 上次同步 $syncTime"
           open = target.intent(context)
         }
       }

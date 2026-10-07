@@ -128,6 +128,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                   widgets.bind(id, EventTarget(BuildConfig.API_BASE_URL.trimEnd('/'), current.userId, selected))
                   ImportantDayWidgetProvider.update(this@WidgetConfigurationActivity, id)
                 }
+                WidgetRefreshScheduler.requestNetwork(this@WidgetConfigurationActivity)
                 setResult(RESULT_OK, result)
                 finish()
               }

@@ -166,6 +166,15 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   }
 
   fun refreshIfNeeded() {
+    val current = session
+    if (current != null && store.loadSession() == null) { logout(); return }
+    val disk = current?.let { store.loadSnapshot(it.userId) }
+    if (disk != null && disk.syncedAt > (snapshot?.syncedAt ?: 0)) {
+      snapshot = disk
+      offline = networkAvailable == false
+      syncFailed = false
+    }
+    updateWidgets()
     if (session == null || busy || networkAvailable == false) return
     val cached = snapshot
     val today = clock.instant().atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()
@@ -178,10 +187,10 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
     val context = getApplication<Application>()
     session?.let {
       top.zwtx.daysmatter.widget.WidgetStore(context).recordSyncState(it.userId,
-        when { offline -> "离线缓存"; syncFailed -> "同步失败，显示缓存"; else -> "缓存" })
+        when { offline -> top.zwtx.daysmatter.widget.WidgetSyncState.OFFLINE; syncFailed -> top.zwtx.daysmatter.widget.WidgetSyncState.FAILED; else -> top.zwtx.daysmatter.widget.WidgetSyncState.CACHED })
     }
-    top.zwtx.daysmatter.widget.ImportantDayWidgetProvider.updateAll(context)
-    top.zwtx.daysmatter.widget.UpcomingWidgetProvider.updateAll(context)
+    top.zwtx.daysmatter.widget.WidgetUpdates.redraw(context, clock.instant())
+    top.zwtx.daysmatter.widget.WidgetRefreshScheduler.ensureScheduled(context)
   }
 
   private fun completeOperation(owner: Session?) {

@@ -25,8 +25,13 @@ class WidgetStore(context: Context) {
   } ?: AppearanceMode.SYSTEM
   fun saveAppearance(id: Int, mode: AppearanceMode) { preferences.edit().putString("appearance_$id", mode.name).apply() }
   fun remove(id: Int) { preferences.edit().remove("instance_$id").remove("upcoming_$id").remove("appearance_$id").apply() }
-  fun recordSyncState(userId: Int, status: String) { preferences.edit().putString("sync_$userId", status).apply() }
-  fun syncState(userId: Int): String = preferences.getString("sync_$userId", "缓存") ?: "缓存"
+  fun recordSyncState(userId: Int, status: WidgetSyncState) { preferences.edit().putString("sync_$userId", status.name).apply() }
+  fun syncState(userId: Int): WidgetSyncState {
+    val stored = preferences.getString("sync_$userId", null)
+    return WidgetSyncState.entries.firstOrNull { it.name == stored || it.label == stored } ?: WidgetSyncState.CACHED
+  }
 }
 
 data class UpcomingBinding(val backend: String, val userId: Int, val window: Int = 30, val categoryId: Int = 0)
+
+enum class WidgetSyncState(val label: String) { CACHED("缓存"), OFFLINE("离线缓存"), FAILED("同步失败，显示缓存") }

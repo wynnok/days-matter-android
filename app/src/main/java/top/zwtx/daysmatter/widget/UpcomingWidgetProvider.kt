@@ -19,9 +19,10 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 class UpcomingWidgetProvider : AppWidgetProvider() {
-  override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) { ids.forEach { update(context, it) } }
+  override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) { ids.forEach { update(context, it) }; WidgetRefreshScheduler.requestNetwork(context) }
   override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) { update(context, id) }
   override fun onDeleted(context: Context, ids: IntArray) { ids.forEach { WidgetStore(context).remove(it) } }
+  override fun onDisabled(context: Context) { WidgetRefreshScheduler.ensureScheduled(context) }
 
   companion object {
     private val rows = intArrayOf(R.id.upcoming_row_1, R.id.upcoming_row_2, R.id.upcoming_row_3, R.id.upcoming_row_4, R.id.upcoming_row_5)
@@ -85,7 +86,7 @@ class UpcomingWidgetProvider : AppWidgetProvider() {
       val status = if (snapshot != null && !deleted) {
         val time = if (snapshot.syncedAt > 0) Instant.ofEpochMilli(snapshot.syncedAt).atZone(ZoneId.of("Asia/Shanghai"))
           .format(DateTimeFormatter.ofPattern("MM-dd HH:mm")) else "尚未获取"
-        "${if (unknown > 0) "$unknown 个日期待同步 · " else ""}${WidgetStore(context).syncState(session!!.userId)} · 上次同步 $time"
+        "${if (unknown > 0) "$unknown 个日期待同步 · " else ""}${WidgetStore(context).syncState(session!!.userId).label} · 上次同步 $time"
       } else ""
       views.setTextViewText(R.id.upcoming_status, status)
       views.setViewVisibility(R.id.upcoming_add, if (height >= 240 && owned && !deleted) View.VISIBLE else View.GONE)

@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicInteger
 /** A controlled external HTTP service shared by navigation and desktop integration tests. */
 class AccountTestServer : AutoCloseable {
   var userId = 7
+  var captureEventsBeforePause = false
+  var applyEventWrites = false
   var events = JSONArray().put(JSONObject().put("event_id", 11).put("event_name", "目标事件")
     .put("server_next_occurrence", "2026-10-20"))
   var emptyEvents = false
@@ -20,6 +22,8 @@ class AccountTestServer : AutoCloseable {
   var failRefreshAfterWrite = false
   var eventsPaused = CountDownLatch(0)
   var exportPaused = CountDownLatch(0)
+  val eventsStarted = CountDownLatch(1)
+  val eventRequests = AtomicInteger()
   val exportStarted = CountDownLatch(1)
   var loginPaused = CountDownLatch(0)
   val loginStarted = CountDownLatch(1)
@@ -30,8 +34,13 @@ class AccountTestServer : AutoCloseable {
     createContext("/") { exchange ->
       val path = exchange.requestURI.path
       val requestedUser = userId
+      val capturedEvents = if (path == "/events" && captureEventsBeforePause) JSONArray(events.toString()) else null
+      if (path.startsWith("/events/") && exchange.requestMethod == "PUT" && applyEventWrites) {
+        val body = JSONObject(exchange.requestBody.bufferedReader().use { it.readText() })
+        events.getJSONObject(0).put("event_name", body.getString("event_name"))
+      }
       when (path) {
-        "/events" -> eventsPaused.await(5, TimeUnit.SECONDS)
+        "/events" -> { eventRequests.incrementAndGet(); eventsStarted.countDown(); eventsPaused.await(5, TimeUnit.SECONDS) }
         "/data/export" -> { exportStarted.countDown(); exportPaused.await(5, TimeUnit.SECONDS) }
         "/auth/login" -> { loginStarted.countDown(); loginPaused.await(5, TimeUnit.SECONDS) }
       }
@@ -45,7 +54,7 @@ class AccountTestServer : AutoCloseable {
         "/auth/login" -> JSONObject().put("user_id", requestedUser).put("name", "账号$requestedUser")
           .put("email", "test@example.com").put("token", "synthetic-token-$requestedUser")
         "/user/info" -> JSONObject().put("nickname", "账号$requestedUser").put("email", "test@example.com")
-        "/events" -> if (emptyEvents) JSONArray() else events
+        "/events" -> if (emptyEvents) JSONArray() else capturedEvents ?: events
         "/data/export" -> JSONObject().put("version", "1.0.0")
         else -> if (exchange.requestMethod == "GET") JSONArray() else JSONObject().put("event_id", 11)
       }

@@ -28,6 +28,7 @@ class WidgetSyncIntegrationTest {
   private lateinit var server: AccountTestServer
   private lateinit var vm: MainViewModel
   private var widgetId = 0
+  private var recentId = 0
 
   @Before fun start() {
     server = AccountTestServer()
@@ -40,7 +41,12 @@ class WidgetSyncIntegrationTest {
       provider = ComponentName(app, ImportantDayWidgetProvider::class.java)
     })
     WidgetStore(app).bind(widgetId, EventTarget(BuildConfig.API_BASE_URL.trimEnd('/'), 7, 11))
-    ImportantDayWidgetProvider.updateAll(app)
+    recentId = shadowOf(manager).createWidget(UpcomingWidgetProvider::class.java, R.layout.upcoming_widget)
+    shadowOf(manager).putWidgetInfo(recentId, AppWidgetProviderInfo().apply {
+      provider = ComponentName(app, UpcomingWidgetProvider::class.java)
+    })
+    WidgetStore(app).saveUpcoming(recentId, UpcomingBinding(BuildConfig.API_BASE_URL, 7))
+    WidgetUpdates.redraw(app)
     assertEquals("目标事件", text(R.id.widget_name))
   }
   @After fun stop() { server.close() }
@@ -70,6 +76,7 @@ class WidgetSyncIntegrationTest {
     compose.runOnIdle { vm.logout() }
     assertEquals("请登录以查看重要日子", text(R.id.widget_days))
     assertEquals("重要日子", text(R.id.widget_name))
+    assertEquals("请登录以查看近期日程", shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_row_1).text.toString())
   }
 
   @Test fun expiredAuthenticationImmediatelyHidesDesktopAccountData() {
@@ -77,6 +84,7 @@ class WidgetSyncIntegrationTest {
     compose.runOnIdle { vm.refresh() }
     waitForRequest()
     assertNull(vm.session)
+    assertEquals("请登录以查看近期日程", shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_row_1).text.toString())
     assertEquals("请登录以查看重要日子", text(R.id.widget_days))
     assertFalse(shadowOf(manager).getViewFor(widgetId).contentDescription.toString().contains("目标事件"))
   }
