@@ -62,13 +62,18 @@ class DeviceManagementScreenTest {
   }
   @Test fun desktopManagementOpensSystemConfigurationForSelectedInstance() {
     login()
-    val manager = android.appwidget.AppWidgetManager.getInstance(app)
+    val manager = android.appwidget.AppWidgetManager.getInstance(activityContext)
     val id = shadowOf(manager).createWidget(top.zwtx.daysmatter.widget.ImportantDayWidgetProvider::class.java,
       R.layout.important_day_widget)
+    shadowOf(manager).putWidgetInfo(id, android.appwidget.AppWidgetProviderInfo().apply {
+      provider = android.content.ComponentName(app, top.zwtx.daysmatter.widget.ImportantDayWidgetProvider::class.java)
+    })
+    assertTrue(top.zwtx.daysmatter.widget.ImportantDayWidgetProvider.instanceIds(activityContext).contains(id))
     top.zwtx.daysmatter.widget.WidgetStore(app).bind(id,
       EventTarget(BuildConfig.API_BASE_URL.trimEnd('/'), 7, 11))
     compose.onNodeWithText("我的").performClick()
-    compose.onNodeWithText("重要日子").performScrollTo().performClick()
+    compose.onNodeWithText("退出登录").performScrollTo()
+    compose.onNodeWithText("重要日子").performClick()
     compose.onNodeWithText("实例 $id · 目标事件").performScrollTo().assertExists()
     compose.onNodeWithText("配置实例 $id").performScrollTo().performClick()
     compose.runOnIdle {
