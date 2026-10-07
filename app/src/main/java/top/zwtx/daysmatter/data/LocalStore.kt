@@ -116,6 +116,16 @@ class LocalStore(private val context: Context) {
     preferences.edit().putString(remindersKey(userId), all.toString()).apply()
   }
 
+  fun pendingEventTarget(): top.zwtx.daysmatter.EventTarget? = runCatching {
+    top.zwtx.daysmatter.EventTarget.fromJson(JSONObject(preferences.getString("pending_event_target", null) ?: return null))
+  }.getOrNull()
+
+  fun savePendingEventTarget(target: top.zwtx.daysmatter.EventTarget?) {
+    preferences.edit().apply {
+      if (target == null) remove("pending_event_target") else putString("pending_event_target", target.toJson().toString())
+    }.apply()
+  }
+
   fun clearAccount(userId: Int) {
     preferences.edit().remove("session").remove(remindersKey(userId)).apply()
     cacheFile(userId).delete()

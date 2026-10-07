@@ -8,13 +8,9 @@ import android.net.Uri
 import top.zwtx.daysmatter.data.Event
 import top.zwtx.daysmatter.data.LocalStore
 import top.zwtx.daysmatter.data.Snapshot
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
 
 class ReminderScheduler(private val context: Context, private val store: LocalStore) {
   private val alarms = context.getSystemService(AlarmManager::class.java)
-  private val businessZone = ZoneId.of("Asia/Shanghai")
 
   private fun pendingIntent(userId: Int, eventId: Int, event: Event? = null): PendingIntent {
     val intent = Intent(context, ReminderReceiver::class.java).apply {
@@ -22,6 +18,8 @@ class ReminderScheduler(private val context: Context, private val store: LocalSt
       if (event != null) {
         putExtra("event_name", event.name)
         putExtra("event_id", event.id)
+        putExtra("user_id", userId)
+        putExtra("backend", top.zwtx.daysmatter.BuildConfig.API_BASE_URL.trimEnd('/'))
       }
     }
     return PendingIntent.getBroadcast(
@@ -46,18 +44,8 @@ class ReminderScheduler(private val context: Context, private val store: LocalSt
     snapshot.events.forEach { event ->
       val preference = store.localReminder(userId, event.id)
       if (!preference.enabled) return@forEach
-      val occurrence = event.nextOccurrence ?: return@forEach
-      val triggerAt = try {
-        LocalDate.parse(occurrence)
-          .minusDays(preference.advanceDays.toLong())
-          .atTime(LocalTime.parse(preference.time))
-          .atZone(businessZone)
-          .toInstant()
-          .toEpochMilli()
-      } catch (_: Exception) {
-        return@forEach
-      }
-      if (triggerAt <= System.currentTimeMillis()) return@forEach
+      val timing = reminderTiming(event, preference) as? ReminderTiming.Upcoming ?: return@forEach
+      val triggerAt = timing.timestamp
       alarms.setAndAllowWhileIdle(
         AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(userId, event.id, event)
       )

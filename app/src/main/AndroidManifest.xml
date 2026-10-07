@@ -21,6 +21,13 @@
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity>
+    <activity android:name=".widget.WidgetConfigurationActivity" android:exported="true">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
+    </activity>
+    <receiver android:name=".widget.ImportantDayWidgetProvider" android:exported="false" android:label="重要日子">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/important_day_widget_info" />
+    </receiver>
     <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
     <receiver android:name=".reminder.RescheduleReceiver" android:exported="false">
       <intent-filter>

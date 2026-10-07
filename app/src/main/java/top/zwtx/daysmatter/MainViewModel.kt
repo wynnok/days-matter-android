@@ -21,6 +21,8 @@ import top.zwtx.daysmatter.data.LocalStore
 import top.zwtx.daysmatter.data.Profile
 import top.zwtx.daysmatter.data.Session
 import top.zwtx.daysmatter.data.Snapshot
+import top.zwtx.daysmatter.data.withSavedEvent
+import top.zwtx.daysmatter.data.withDeletedEvent
 import top.zwtx.daysmatter.reminder.ReminderScheduler
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -58,6 +60,67 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   var appearanceMode by mutableStateOf(store.appearanceMode())
     private set
 
+  private var authenticationGeneration = 0
+  private val backend = api.baseUrl
+  private var pendingTarget = store.pendingEventTarget()
+  var eventNavigation by mutableStateOf<EventTarget?>(null)
+    private set
+
+  var eventEntryRequest by mutableStateOf(0)
+    private set
+
+  var eventCreationNavigation by mutableStateOf(false)
+    private set
+  fun consumeEventCreation() { eventCreationNavigation = false }
+
+  fun openEvent(intent: android.content.Intent) {
+    if (intent.getBooleanExtra("create_event", false)) {
+      clearEventTarget()
+      eventNavigation = null
+      if (session?.userId == intent.getIntExtra("user_id", 0) && intent.getStringExtra("backend") == backend) {
+        eventEntryRequest++
+        eventCreationNavigation = true
+      } else message = "请登录事件所属账号后创建事件"
+      return
+    }
+
+    val target = EventTarget.fromIntent(intent) ?: return
+    eventNavigation = null
+    eventEntryRequest++
+    pendingTarget = target
+    store.savePendingEventTarget(target)
+    resolveEventTarget()
+  }
+
+  fun consumeEventNavigation() { eventNavigation = null }
+
+  private fun clearEventTarget() {
+    pendingTarget = null
+    store.savePendingEventTarget(null)
+  }
+
+  private fun resolveEventTarget(confirmed: Boolean = false, failed: Boolean = false) {
+    val target = pendingTarget ?: return
+    if (target.backend.trimEnd('/') != backend) {
+      clearEventTarget()
+      message = "事件属于其他服务，请在对应服务中打开"
+      return
+    }
+    val current = session ?: run { message = "请登录事件所属账号以打开此事件"; return }
+    if (target.userId != current.userId) {
+      clearEventTarget()
+      message = "事件属于其他账号，已返回首页"
+      return
+    }
+    if (snapshot?.events?.any { it.id == target.eventId } == true) {
+      eventNavigation = target
+      clearEventTarget()
+    } else if (confirmed || failed) {
+      clearEventTarget()
+      message = if (confirmed) "事件已删除或不可用，已返回首页" else "暂时无法获取事件，已返回首页，请联网后重试"
+    } else if (!busy) refresh()
+  }
+
   init {
     if (session != null) refresh()
   }
@@ -80,7 +143,7 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   fun networkChanged(available: Boolean) {
     val recovering = networkAvailable == false || offline || syncFailed
     networkAvailable = available
-    if (!available) offline = true
+    if (!available) { offline = true; updateWidgets() }
     else if (busy && recovering) pendingNetworkRecovery = true
     else refreshIfNeeded()
   }
@@ -94,9 +157,20 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
       clock.millis() - cached.syncedAt >= 60_000 || cached.syncedAt > clock.millis()) refresh()
   }
 
+  private fun updateWidgets() {
+    val context = getApplication<Application>()
+    session?.let {
+      top.zwtx.daysmatter.widget.WidgetStore(context).recordSyncState(it.userId,
+        when { offline -> "离线缓存"; syncFailed -> "同步失败，显示缓存"; else -> "缓存" })
+    }
+    top.zwtx.daysmatter.widget.ImportantDayWidgetProvider.updateAll(context)
+  }
+
   private fun completeOperation(owner: Session?) {
     if (session !== owner) return
     busy = false
+    updateWidgets()
+    resolveEventTarget(failed = offline || syncFailed)
     if (pendingNetworkRecovery) {
       pendingNetworkRecovery = false
       refreshIfNeeded()
@@ -123,10 +197,13 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
     if (this.session !== session) return
     val refreshed = repository.refresh(session)
     if (this.session !== session) return
+    store.saveSnapshot(session.userId, refreshed)
     snapshot = refreshed
     scheduler.reschedule(session.userId, refreshed)
     offline = networkAvailable == false
     syncFailed = false
+    updateWidgets()
+    resolveEventTarget(confirmed = true)
   }
 
   private fun reportAfterWrite(error: Exception, current: Session, successMessage: String) {
@@ -166,57 +243,72 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
 
   fun login(email: String, password: String) {
     if (busy) return
+    val generation = ++authenticationGeneration
     viewModelScope.launch {
       var authenticated: Session? = null
       busy = true
       try {
-        session = repository.login(email.trim(), password)
+        val result = repository.login(email.trim(), password)
+        if (generation != authenticationGeneration) return@launch
+        store.saveSession(result)
+        session = result
         authenticated = session
         lastExport = session?.let { store.lastExport(it.userId) } ?: 0L
         snapshot = session?.let { store.loadSnapshot(it.userId) }
+        updateWidgets()
         offline = false
         syncFailed = false
         load(session!!)
       } catch (error: Exception) {
+        if (generation != authenticationGeneration) return@launch
         val current = session
         offline = current != null && error is IOException
         syncFailed = current != null && (error !is ApiException || error.code != 401)
         report(error, current)
       } finally {
-        if (session === authenticated) completeOperation(authenticated)
+        if (generation == authenticationGeneration && session === authenticated) completeOperation(authenticated)
       }
     }
   }
 
   fun register(name: String, email: String, password: String) {
     if (busy) return
+    val generation = ++authenticationGeneration
     viewModelScope.launch {
       var authenticated: Session? = null
       busy = true
       try {
-        session = repository.register(name.trim(), email.trim(), password)
+        val result = repository.register(name.trim(), email.trim(), password)
+        if (generation != authenticationGeneration) return@launch
+        store.saveSession(result)
+        session = result
         authenticated = session
         lastExport = session?.let { store.lastExport(it.userId) } ?: 0L
         snapshot = null
+        updateWidgets()
         offline = false
         syncFailed = false
         load(session!!)
       } catch (error: Exception) {
+        if (generation != authenticationGeneration) return@launch
         val current = session
         offline = current != null && error is IOException
         syncFailed = current != null && (error !is ApiException || error.code != 401)
         report(error, current)
       } finally {
-        if (session === authenticated) completeOperation(authenticated)
+        if (generation == authenticationGeneration && session === authenticated) completeOperation(authenticated)
       }
     }
   }
 
   fun logout() {
+    authenticationGeneration++
     session?.let {
       scheduler.cancelAll(it.userId)
       store.clearAccount(it.userId)
     }
+    eventNavigation = null
+    eventCreationNavigation = false
     importPreview = null
     importOwner = null
     importOutcome = null
@@ -231,6 +323,7 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
     savingProfile = false
     refreshing = false
     pendingNetworkRecovery = false
+    updateWidgets()
   }
 
   fun localReminder(eventId: Int): LocalReminder =
@@ -285,6 +378,9 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
         message = "保存成功"
         onDone(id)
         store.saveLocalReminder(current.userId, id, reminder)
+        snapshot = snapshot?.withSavedEvent(id, body, result)
+        snapshot?.let { store.saveSnapshot(current.userId, it); scheduler.reschedule(current.userId, it) }
+        updateWidgets()
         load(current)
       } catch (error: Exception) {
         if (saved) reportAfterWrite(error, current, "保存成功") else {
@@ -344,6 +440,9 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
           path.substringAfterLast('/').toIntOrNull()?.let { id ->
             scheduler.cancel(current.userId, id)
             store.removeLocalReminder(current.userId, id)
+            snapshot = snapshot?.withDeletedEvent(id)
+            snapshot?.let { store.saveSnapshot(current.userId, it) }
+            updateWidgets()
           }
         }
         load(current)

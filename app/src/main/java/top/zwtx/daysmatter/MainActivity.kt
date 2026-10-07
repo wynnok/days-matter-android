@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -82,27 +83,33 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 
 class MainActivity : ComponentActivity() {
-  private lateinit var appViewModel: MainViewModel
+  private val appViewModel: MainViewModel by viewModels()
   private val networkCallback = object : ConnectivityManager.NetworkCallback() {
     override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
       val available = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-      runOnUiThread { if (::appViewModel.isInitialized) appViewModel.networkChanged(available) }
+      runOnUiThread { appViewModel.networkChanged(available) }
     }
     override fun onLost(network: Network) {
       runOnUiThread {
         val connectivity = getSystemService(ConnectivityManager::class.java)
         val available = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
           ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-        if (::appViewModel.isInitialized) appViewModel.networkChanged(available)
+        appViewModel.networkChanged(available)
       }
     }
   }
 
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    appViewModel.openEvent(intent)
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    val vm = appViewModel
+    if (savedInstanceState == null) vm.openEvent(intent)
     setContent {
-      val vm: MainViewModel = viewModel()
-      appViewModel = vm
       LaunchedEffect(vm) {
         val connectivity = getSystemService(ConnectivityManager::class.java)
         vm.networkChanged(connectivity.getNetworkCapabilities(connectivity.activeNetwork)
@@ -131,7 +138,7 @@ class MainActivity : ComponentActivity() {
     super.onStart()
     val connectivity = getSystemService(ConnectivityManager::class.java)
     connectivity.registerDefaultNetworkCallback(networkCallback)
-    if (::appViewModel.isInitialized) appViewModel.networkChanged(
+    appViewModel.networkChanged(
       connectivity.getNetworkCapabilities(connectivity.activeNetwork)
         ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     )
@@ -139,7 +146,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onResume() {
     super.onResume()
-    if (::appViewModel.isInitialized) appViewModel.refreshIfNeeded()
+    appViewModel.refreshIfNeeded()
   }
 
   override fun onStop() {
@@ -150,7 +157,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DaysMatterApp(vm: MainViewModel) {
+internal fun DaysMatterApp(vm: MainViewModel) {
   val lifecycle = LocalLifecycleOwner.current.lifecycle
   val displayInstant by produceState(Instant.now(), lifecycle) {
     lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -169,6 +176,7 @@ private fun DaysMatterApp(vm: MainViewModel) {
   var channelId by rememberSaveable { mutableIntStateOf(0) }
   var subEventId by rememberSaveable { mutableIntStateOf(0) }
   var confirmDeleteEvent by remember { mutableStateOf(false) }
+  var editingCategoryId by rememberSaveable { mutableIntStateOf(0) }
   var categoryFilter by rememberSaveable { mutableIntStateOf(0) }
   var exportText by remember { mutableStateOf<String?>(null) }
   var exportOwner by remember { mutableStateOf<top.zwtx.daysmatter.data.Session?>(null) }
@@ -202,11 +210,26 @@ private fun DaysMatterApp(vm: MainViewModel) {
 
   top.zwtx.daysmatter.ui.BackupImportDialog(vm)
 
-  LaunchedEffect(vm.session?.userId) {
+  LaunchedEffect(vm.session?.userId, vm.eventEntryRequest) {
     page = "home"
     categoryFilter = 0
     exportText = null
     exportOwner = null
+  }
+  LaunchedEffect(vm.session?.userId, vm.eventNavigation) {
+    val target = vm.eventNavigation
+    if (target != null && target.userId == vm.session?.userId) {
+      eventId = target.eventId
+      page = "event_detail"
+      vm.consumeEventNavigation()
+    }
+  }
+  LaunchedEffect(vm.eventCreationNavigation) {
+    if (vm.eventCreationNavigation && vm.session != null) {
+      eventId = 0
+      page = "event_form"
+      vm.consumeEventCreation()
+    }
   }
   LaunchedEffect(vm.message) {
     vm.message?.let {
@@ -241,9 +264,10 @@ private fun DaysMatterApp(vm: MainViewModel) {
     page = when (page) {
       "event_form" -> if (eventId == 0) "home" else "event_detail"
       "sub_form" -> "event_detail"
+      "category_form" -> "categories"
       "channel_form" -> "channels"
       "event_detail" -> "home"
-      "channels", "help" -> "profile"
+      "channels", "help", "local_reminders", "categories", "widgets" -> "profile"
       else -> "home"
     }
   }
@@ -258,6 +282,10 @@ private fun DaysMatterApp(vm: MainViewModel) {
     "event_detail" -> "倒数日详情"
     "event_form" -> if (eventId == 0) "添加倒数日" else "编辑倒数日"
     "sub_form" -> if (subEventId == 0) "添加子事件" else "编辑子事件"
+    "widgets" -> "桌面小组件"
+    "categories" -> "分类管理"
+    "category_form" -> if (editingCategoryId == 0) "添加分类" else "编辑分类"
+    "local_reminders" -> "本地提醒"
     "channels" -> "站外提醒"
                     "help" -> "帮助与关于"
     "channel_form" -> if (channelId == 0) "添加渠道" else "编辑渠道"
@@ -333,6 +361,10 @@ private fun DaysMatterApp(vm: MainViewModel) {
               },
               onImport = { importFileOwner = vm.session; importLauncher.launch(arrayOf("application/json", "text/plain")) },
               onHelp = { page = "help" },
+              onLocalReminders = { page = "local_reminders" },
+              onCategories = { page = "categories" },
+              onWidgets = { page = "widgets" },
+              displaySnapshot = displaySnapshot,
               contentPadding = screenPadding
             )
             "event_detail" -> EventDetailScreen(
@@ -354,6 +386,15 @@ private fun DaysMatterApp(vm: MainViewModel) {
               vm, eventId, subEventId.takeIf { it != 0 },
               onSaved = { page = "event_detail" }, contentPadding = screenPadding
             )
+            "widgets" -> top.zwtx.daysmatter.ui.WidgetManagementScreen(vm,
+              onConfigure = { context.startActivity(top.zwtx.daysmatter.widget.ImportantDayWidgetProvider.configurationIntent(context, it)) }, padding = screenPadding)
+            "categories" -> top.zwtx.daysmatter.ui.CategoryListScreen(vm,
+              onAdd = { editingCategoryId = 0; page = "category_form" },
+              onEdit = { editingCategoryId = it; page = "category_form" }, contentPadding = screenPadding)
+            "category_form" -> top.zwtx.daysmatter.ui.CategoryEditorScreen(vm, editingCategoryId.takeIf { it != 0 },
+              onSaved = { page = "categories" }, contentPadding = screenPadding)
+            "local_reminders" -> top.zwtx.daysmatter.ui.LocalReminderScreen(vm,
+              onConfigure = { eventId = it; page = "event_form" }, contentPadding = screenPadding, displayInstant = displayInstant)
             "help" -> HelpScreen(screenPadding)
             "channels" -> ChannelListScreen(
               vm, onAdd = { channelId = 0; page = "channel_form" },

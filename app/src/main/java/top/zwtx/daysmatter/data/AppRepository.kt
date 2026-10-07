@@ -10,7 +10,7 @@ class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClien
     val data = api.objectData(
       "POST", "/auth/login", body = JSONObject().put("email", email).put("password", password)
     )
-    return Session.fromJson(data).also(store::saveSession)
+    return Session.fromJson(data)
   }
 
   suspend fun register(name: String, email: String, password: String): Session {
@@ -18,7 +18,7 @@ class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClien
       "POST", "/auth/register",
       body = JSONObject().put("name", name).put("email", email).put("password", password)
     )
-    return Session.fromJson(data).also(store::saveSession)
+    return Session.fromJson(data)
   }
 
   suspend fun refresh(session: Session): Snapshot = coroutineScope {
@@ -32,7 +32,7 @@ class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClien
       .put("channels", channels.await())
       .put("events", events.await())
       .put("synced_at", clock.millis())
-    Snapshot.fromJson(raw).also { store.saveSnapshot(session.userId, it) }
+    Snapshot.fromJson(raw)
   }
 
   suspend fun write(session: Session, method: String, path: String, body: JSONObject? = null): JSONObject =

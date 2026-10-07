@@ -15,19 +15,19 @@ import top.zwtx.daysmatter.R
 
 class ReminderReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
-    if (Build.VERSION.SDK_INT >= 33 &&
-      context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-    ) return
+    val support = ReminderNotifications(context)
+    support.createChannel()
+    if (!support.permissionGranted || !support.appEnabled || !support.channelEnabled) return
 
+    val target = top.zwtx.daysmatter.EventTarget.fromIntent(intent) ?: return
+    val session = top.zwtx.daysmatter.data.LocalStore(context).loadSession() ?: return
+    if (session.userId != target.userId || target.backend != top.zwtx.daysmatter.BuildConfig.API_BASE_URL.trimEnd('/')) return
     val eventName = intent.getStringExtra("event_name") ?: return
     val eventId = intent.getIntExtra("event_id", 0)
     val notifications = context.getSystemService(NotificationManager::class.java)
-    val channelId = "event_reminders"
-    notifications.createNotificationChannel(
-      NotificationChannel(channelId, "事件提醒", NotificationManager.IMPORTANCE_DEFAULT)
-    )
+    val channelId = ReminderNotifications.CHANNEL
     val openApp = PendingIntent.getActivity(
-      context, 0, Intent(context, MainActivity::class.java),
+      context, 0, target.intent(context),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
     val notification = Notification.Builder(context, channelId)
