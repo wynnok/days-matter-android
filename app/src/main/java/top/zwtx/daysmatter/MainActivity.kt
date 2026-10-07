@@ -216,6 +216,13 @@ internal fun DaysMatterApp(vm: MainViewModel) {
     exportText = null
     exportOwner = null
   }
+  LaunchedEffect(vm.homeCategoryNavigation) {
+    vm.homeCategoryNavigation?.let {
+      categoryFilter = it
+      page = "home"
+      vm.consumeHomeNavigation()
+    }
+  }
   LaunchedEffect(vm.session?.userId, vm.eventNavigation) {
     val target = vm.eventNavigation
     if (target != null && target.userId == vm.session?.userId) {

@@ -28,6 +28,10 @@
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
       <meta-data android:name="android.appwidget.provider" android:resource="@xml/important_day_widget_info" />
     </receiver>
+    <receiver android:name=".widget.UpcomingWidgetProvider" android:exported="false" android:label="近期日程">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/upcoming_widget_info" />
+    </receiver>
     <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
     <receiver android:name=".reminder.RescheduleReceiver" android:exported="false">
       <intent-filter>

@@ -1,4 +1,5 @@
 <resources>
   <string name="app_name">Days Matter</string>
   <string name="important_day_widget_description">固定关注一个主事件，查看已确认日期与天数</string>
+  <string name="upcoming_widget_description">按已确认日期查看近期日程，可独立选择窗口和分类</string>
 </resources>

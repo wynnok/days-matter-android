@@ -235,4 +235,25 @@ class WidgetConfigurationFlowTest {
       }
     }
   }
+  @Test fun upcomingConfigurationSavesWindowAndCancellingPreservesOriginal() {
+    val id = shadowOf(manager).createWidget(UpcomingWidgetProvider::class.java, R.layout.upcoming_widget)
+    shadowOf(manager).putWidgetInfo(id, AppWidgetProviderInfo().apply {
+      provider = ComponentName(app, UpcomingWidgetProvider::class.java)
+      configure = ComponentName(app, WidgetConfigurationActivity::class.java)
+    })
+    val controller = configure(id)
+    compose.onNodeWithText("近期 30 天（已选）").assertExists()
+    compose.onNodeWithText("近期 7 天").performClick()
+    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    assertEquals(android.app.Activity.RESULT_OK, shadowOf(controller.get()).resultCode)
+    assertEquals("近期 7 天 · 全部", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_title).text.toString())
+    controller.pause().stop().destroy()
+    val reconfigure = configure(id)
+    compose.onNodeWithText("近期 30 天").performClick()
+    compose.onNodeWithText("取消").performScrollTo().performClick()
+    reconfigure.pause().stop().destroy()
+    UpcomingWidgetProvider.updateAll(app)
+    assertEquals("近期 7 天 · 全部", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_title).text.toString())
+  }
+
 }

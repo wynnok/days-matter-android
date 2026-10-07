@@ -69,11 +69,28 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   var eventEntryRequest by mutableStateOf(0)
     private set
 
+  var homeCategoryNavigation by mutableStateOf<Int?>(null)
+    private set
+  fun consumeHomeNavigation() { homeCategoryNavigation = null }
+
   var eventCreationNavigation by mutableStateOf(false)
     private set
   fun consumeEventCreation() { eventCreationNavigation = false }
 
   fun openEvent(intent: android.content.Intent) {
+    if (intent.getBooleanExtra("widget_home", false)) {
+      clearEventTarget()
+      eventNavigation = null
+      eventEntryRequest++
+      if (session?.userId == intent.getIntExtra("user_id", 0) && intent.getStringExtra("backend") == backend) {
+        val category = intent.getIntExtra("category_id", 0)
+        if (category != 0 && snapshot?.categories?.none { it.id == category } == true) message = "分类已删除，请重新配置小组件"
+        else homeCategoryNavigation = category
+        if (intent.getBooleanExtra("create_event", false)) eventCreationNavigation = true
+        if (intent.getBooleanExtra("widget_refresh", false)) refresh()
+      } else message = "请登录小组件所属账号后查看日程"
+      return
+    }
     if (intent.getBooleanExtra("create_event", false)) {
       clearEventTarget()
       eventNavigation = null
@@ -164,6 +181,7 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
         when { offline -> "离线缓存"; syncFailed -> "同步失败，显示缓存"; else -> "缓存" })
     }
     top.zwtx.daysmatter.widget.ImportantDayWidgetProvider.updateAll(context)
+    top.zwtx.daysmatter.widget.UpcomingWidgetProvider.updateAll(context)
   }
 
   private fun completeOperation(owner: Session?) {
