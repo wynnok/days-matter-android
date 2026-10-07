@@ -309,6 +309,8 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
     }
     eventNavigation = null
     eventCreationNavigation = false
+    pendingExport = null
+    pendingImportFileOwner = null
     importPreview = null
     importOwner = null
     importOutcome = null
@@ -484,6 +486,53 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   var lastExport by mutableStateOf(session?.let { store.lastExport(it.userId) } ?: 0L)
     private set
 
+  private data class PendingExport(val owner: Session, val text: String)
+  private var pendingExport: PendingExport? = null
+  private var pendingImportFileOwner: Session? = null
+
+  fun completeExportSelection(uri: Uri?) {
+    val pending = pendingExport
+    pendingExport = null
+    if (pending == null) {
+      if (uri != null && session != null) message = "保存选择已过期，请重新导出备份"
+      return
+    }
+    if (session !== pending.owner) return
+    if (uri == null) message = "已取消保存备份"
+    else saveExport(uri, pending.text, pending.owner)
+  }
+
+  fun beginImportSelection(): Boolean {
+    val current = session ?: return false
+    if (busy) return false
+    pendingImportFileOwner = current
+    return true
+  }
+
+  fun completeImportSelection(uri: Uri?) {
+    val owner = pendingImportFileOwner
+    pendingImportFileOwner = null
+    if (owner == null) {
+      if (uri != null && session != null) message = "文件选择已过期，请重新选择备份"
+      return
+    }
+    if (session !== owner) return
+    if (uri == null) { message = "已取消选择备份"; return }
+    viewModelScope.launch {
+      try {
+        val content = withContext(Dispatchers.IO) {
+          getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }
+        if (session !== owner) return@launch
+        if (content == null) message = "无法读取文件"
+        else if (busy) message = "当前操作正在进行，请稍后重新选择备份"
+        else prepareImport(content, owner)
+      } catch (_: Exception) {
+        if (session === owner) message = "读取文件失败"
+      }
+    }
+  }
+
   fun saveExport(uri: Uri, text: String, owner: Session) {
     if (session !== owner) return
     viewModelScope.launch {
@@ -508,7 +557,11 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
       busy = true
       try {
         val data = repository.exportData(current)
-        if (session === current) onReady(data.toString(2))
+        if (session === current) {
+          val text = data.toString(2)
+          pendingExport = PendingExport(current, text)
+          onReady(text)
+        }
       } catch (error: Exception) {
         report(error, current)
       } finally {

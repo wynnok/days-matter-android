@@ -178,8 +178,6 @@ internal fun DaysMatterApp(vm: MainViewModel) {
   var confirmDeleteEvent by remember { mutableStateOf(false) }
   var editingCategoryId by rememberSaveable { mutableIntStateOf(0) }
   var categoryFilter by rememberSaveable { mutableIntStateOf(0) }
-  var exportText by remember { mutableStateOf<String?>(null) }
-  var exportOwner by remember { mutableStateOf<top.zwtx.daysmatter.data.Session?>(null) }
   val homeStateHolder = key(vm.session?.userId) { rememberSaveableStateHolder() }
   val snackbar = remember { SnackbarHostState() }
   val hazeState = remember { HazeState() }
@@ -189,23 +187,10 @@ internal fun DaysMatterApp(vm: MainViewModel) {
   val context = androidx.compose.ui.platform.LocalContext.current
 
   val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-    val content = exportText
-    val owner = exportOwner
-    if (uri != null && content != null && owner != null) vm.saveExport(uri, content, owner)
-    else if (uri == null && owner === vm.session) vm.showMessage("已取消保存备份")
-    exportOwner = null
-    exportText = null
+    vm.completeExportSelection(uri)
   }
-  var importFileOwner by remember { mutableStateOf<top.zwtx.daysmatter.data.Session?>(null) }
   val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-    if (uri != null) {
-      try {
-        val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        if (content == null) vm.showMessage("无法读取文件") else vm.prepareImport(content, importFileOwner)
-      } catch (_: Exception) {
-        vm.showMessage("读取文件失败")
-      }
-    }
+    vm.completeImportSelection(uri)
   }
 
   top.zwtx.daysmatter.ui.BackupImportDialog(vm)
@@ -213,8 +198,6 @@ internal fun DaysMatterApp(vm: MainViewModel) {
   LaunchedEffect(vm.session?.userId, vm.eventEntryRequest) {
     page = "home"
     categoryFilter = 0
-    exportText = null
-    exportOwner = null
   }
   LaunchedEffect(vm.session?.userId, vm.eventNavigation) {
     val target = vm.eventNavigation
@@ -353,13 +336,11 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               vm,
               onChannels = { page = "channels" },
               onExport = {
-                vm.exportData { text ->
-                  exportOwner = vm.session
-                  exportText = text
+                vm.exportData {
                   exportLauncher.launch("days-matter-backup.json")
                 }
               },
-              onImport = { importFileOwner = vm.session; importLauncher.launch(arrayOf("application/json", "text/plain")) },
+              onImport = { if (vm.beginImportSelection()) importLauncher.launch(arrayOf("application/json", "text/plain")) },
               onHelp = { page = "help" },
               onLocalReminders = { page = "local_reminders" },
               onCategories = { page = "categories" },
