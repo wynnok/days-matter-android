@@ -84,6 +84,36 @@ class BackupSelectionLifecycleTest {
     compose.onNodeWithText("确认追加导入").assertExists()
     assertEquals("分类 0 · 渠道 0 · 主事件 0 · 子事件 0", vm.importPreview?.summary)
   }
+  @Test fun oldImportResultCannotConsumeNewAccountSelection() {
+    val code = openSelection(false)
+    compose.runOnIdle { vm.logout(); server.userId = 8; vm.login("next@example.com", "password") }
+    waitIdle()
+    compose.runOnIdle { assertFalse(vm.beginImportSelection()) }
+    val file = File(RuntimeEnvironment.getApplication().cacheDir, "old-import.json").apply { writeText(backup) }
+    deliver(code, Uri.fromFile(file))
+    compose.runOnIdle {
+      assertNull(vm.importPreview)
+    }
+    val nextCode = openSelection(false)
+    deliver(nextCode, Uri.fromFile(file))
+    compose.waitUntil(5_000) { shadowOf(Looper.getMainLooper()).idle(); vm.importPreview != null }
+  }
+  @Test fun oldExportResultCannotConsumeNewAccountSelection() {
+    val code = openSelection(true)
+    compose.runOnIdle { vm.logout(); server.userId = 8; vm.login("next@example.com", "password") }
+    waitIdle()
+    var relaunched = false
+    compose.runOnIdle { vm.exportData { relaunched = true } }
+    waitIdle()
+    assertFalse(relaunched)
+    val file = File(RuntimeEnvironment.getApplication().cacheDir, "old-result.json")
+    deliver(code, Uri.fromFile(file))
+    assertFalse(file.exists())
+    val nextCode = openSelection(true)
+    deliver(nextCode, Uri.fromFile(file))
+    compose.waitUntil(5_000) { shadowOf(Looper.getMainLooper()).idle(); file.exists() && vm.lastExport > 0 }
+  }
+
   @Test fun cancelledSelectionAfterRecreationDoesNotReportSaved() {
     val code = openSelection(true)
     restoration.emulateSavedInstanceStateRestore()

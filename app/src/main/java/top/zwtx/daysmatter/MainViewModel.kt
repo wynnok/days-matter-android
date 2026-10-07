@@ -309,8 +309,9 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
     }
     eventNavigation = null
     eventCreationNavigation = false
-    pendingExport = null
-    pendingImportFileOwner = null
+    // Keep an empty outstanding request until its URI returns; never let it consume another account's selection.
+    pendingExport = pendingExport?.copy(owner = null, text = null)
+    pendingImportSelection = pendingImportSelection?.copy(owner = null)
     importPreview = null
     importOwner = null
     importOutcome = null
@@ -486,9 +487,10 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   var lastExport by mutableStateOf(session?.let { store.lastExport(it.userId) } ?: 0L)
     private set
 
-  private data class PendingExport(val owner: Session, val text: String)
+  private data class PendingExport(val owner: Session?, val text: String?)
   private var pendingExport: PendingExport? = null
-  private var pendingImportFileOwner: Session? = null
+  private data class PendingImport(val owner: Session?)
+  private var pendingImportSelection: PendingImport? = null
 
   fun completeExportSelection(uri: Uri?) {
     val pending = pendingExport
@@ -497,25 +499,31 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
       if (uri != null && session != null) message = "保存选择已过期，请重新导出备份"
       return
     }
-    if (session !== pending.owner) return
+    val owner = pending.owner ?: return
+    if (session !== owner) return
     if (uri == null) message = "已取消保存备份"
-    else saveExport(uri, pending.text, pending.owner)
+    else pending.text?.let { saveExport(uri, it, owner) }
   }
 
   fun beginImportSelection(): Boolean {
     val current = session ?: return false
     if (busy) return false
-    pendingImportFileOwner = current
+    if (pendingImportSelection != null) {
+      message = "已有文件选择尚未结束，请先完成或取消"
+      return false
+    }
+    pendingImportSelection = PendingImport(current)
     return true
   }
 
   fun completeImportSelection(uri: Uri?) {
-    val owner = pendingImportFileOwner
-    pendingImportFileOwner = null
-    if (owner == null) {
+    val pending = pendingImportSelection
+    pendingImportSelection = null
+    if (pending == null) {
       if (uri != null && session != null) message = "文件选择已过期，请重新选择备份"
       return
     }
+    val owner = pending.owner ?: return
     if (session !== owner) return
     if (uri == null) { message = "已取消选择备份"; return }
     viewModelScope.launch {
@@ -550,6 +558,10 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   }
 
   fun exportData(onReady: (String) -> Unit) {
+    if (pendingExport != null) {
+      message = "已有保存选择尚未结束，请先完成或取消"
+      return
+    }
     val current = session ?: return
     if (busy) return
     if (!requireNetwork()) return
