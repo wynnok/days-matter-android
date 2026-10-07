@@ -22,11 +22,13 @@ import java.time.format.DateTimeFormatter
 class ImportantDayWidgetProvider : AppWidgetProvider() {
   override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
     ids.forEach { update(context, it) }
+    WidgetRefreshScheduler.requestNetwork(context)
   }
   override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) {
     update(context, id)
   }
   override fun onDeleted(context: Context, ids: IntArray) { ids.forEach { WidgetStore(context).remove(it) } }
+  override fun onDisabled(context: Context) { WidgetRefreshScheduler.ensureScheduled(context) }
 
   companion object {
     fun instanceIds(context: Context): IntArray = AppWidgetManager.getInstance(context)
@@ -40,7 +42,8 @@ class ImportantDayWidgetProvider : AppWidgetProvider() {
       .setData(android.net.Uri.parse("daysmatter://widget/configure/$id"))
 
     fun render(context: Context, id: Int, now: Instant = Instant.now(),
-      target: EventTarget? = WidgetStore(context).binding(id)): RemoteViews {
+      target: EventTarget? = WidgetStore(context).binding(id),
+      appearance: top.zwtx.daysmatter.data.AppearanceMode = WidgetStore(context).appearance(id)): RemoteViews {
       val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(id)
       val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160)
       val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 160)
@@ -97,7 +100,7 @@ class ImportantDayWidgetProvider : AppWidgetProvider() {
           val syncTime = if (snapshot.syncedAt > 0) Instant.ofEpochMilli(snapshot.syncedAt)
             .atZone(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.ofPattern(if (compact || small) "MM-dd HH:mm" else "yyyy-MM-dd HH:mm"))
             else "尚未获取"
-          status = "${WidgetStore(context).syncState(session.userId)} · 上次同步 $syncTime"
+          status = "${WidgetStore(context).syncState(session.userId).label} · 上次同步 $syncTime"
           open = target.intent(context)
         }
       }
@@ -111,6 +114,7 @@ class ImportantDayWidgetProvider : AppWidgetProvider() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
       views.setOnClickPendingIntent(R.id.widget_root, pending)
       views.setContentDescription(R.id.widget_root, listOf(name, days, date, category, status).filter { it.isNotBlank() }.joinToString("，"))
+      views.applyWidgetAppearance(appearance, intArrayOf(R.id.widget_name, R.id.widget_days, R.id.widget_date, R.id.widget_category, R.id.widget_status))
       return views
     }
   }

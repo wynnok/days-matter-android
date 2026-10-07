@@ -697,7 +697,7 @@ fun ProfileScreen(
       SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
     }
     SettingsGroup("桌面小组件") {
-      SettingsRow("重要日子", "添加说明与已有实例配置", onWidgets)
+      SettingsRow("管理桌面小组件", "添加说明与已有实例配置", onWidgets)
     }
     SettingsGroup("关于与帮助") {
       SettingsRow("帮助与关于", "日期、备份、提醒及版本声明", onHelp)

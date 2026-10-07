@@ -73,8 +73,8 @@ class DeviceManagementScreenTest {
       EventTarget(BuildConfig.API_BASE_URL.trimEnd('/'), 7, 11))
     compose.onNodeWithText("我的").performClick()
     compose.onNodeWithText("退出登录").performScrollTo()
-    compose.onNodeWithText("重要日子").performClick()
-    compose.onNodeWithText("实例 $id · 目标事件").performScrollTo().assertExists()
+    compose.onNodeWithText("管理桌面小组件").performClick()
+    compose.onNodeWithText("重要日子 · 实例 $id · 目标事件").performScrollTo().assertExists()
     compose.onNodeWithText("配置实例 $id").performScrollTo().performClick()
     compose.runOnIdle {
       val opened = shadowOf(activityContext as android.app.Activity).nextStartedActivity

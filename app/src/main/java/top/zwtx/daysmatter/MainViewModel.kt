@@ -69,11 +69,28 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   var eventEntryRequest by mutableStateOf(0)
     private set
 
+  var homeCategoryNavigation by mutableStateOf<Int?>(null)
+    private set
+  fun consumeHomeNavigation() { homeCategoryNavigation = null }
+
   var eventCreationNavigation by mutableStateOf(false)
     private set
   fun consumeEventCreation() { eventCreationNavigation = false }
 
   fun openEvent(intent: android.content.Intent) {
+    if (intent.getBooleanExtra("widget_home", false)) {
+      clearEventTarget()
+      eventNavigation = null
+      eventEntryRequest++
+      if (session?.userId == intent.getIntExtra("user_id", 0) && intent.getStringExtra("backend") == backend) {
+        val category = intent.getIntExtra("category_id", 0)
+        if (category != 0 && snapshot?.categories?.none { it.id == category } == true) message = "分类已删除，请重新配置小组件"
+        else homeCategoryNavigation = category
+        if (intent.getBooleanExtra("create_event", false)) eventCreationNavigation = true
+        if (intent.getBooleanExtra("widget_refresh", false)) refresh()
+      } else message = "请登录小组件所属账号后查看日程"
+      return
+    }
     if (intent.getBooleanExtra("create_event", false)) {
       clearEventTarget()
       eventNavigation = null
@@ -149,6 +166,15 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
   }
 
   fun refreshIfNeeded() {
+    val current = session
+    if (current != null && store.loadSession() == null) { logout(); return }
+    val disk = current?.let { store.loadSnapshot(it.userId) }
+    if (disk != null && disk.syncedAt > (snapshot?.syncedAt ?: 0)) {
+      snapshot = disk
+      offline = networkAvailable == false
+      syncFailed = false
+    }
+    updateWidgets()
     if (session == null || busy || networkAvailable == false) return
     val cached = snapshot
     val today = clock.instant().atZone(ZoneId.of("Asia/Shanghai")).toLocalDate()
@@ -161,9 +187,10 @@ class MainViewModel(application: Application, api: ApiClient, private val clock:
     val context = getApplication<Application>()
     session?.let {
       top.zwtx.daysmatter.widget.WidgetStore(context).recordSyncState(it.userId,
-        when { offline -> "离线缓存"; syncFailed -> "同步失败，显示缓存"; else -> "缓存" })
+        when { offline -> top.zwtx.daysmatter.widget.WidgetSyncState.OFFLINE; syncFailed -> top.zwtx.daysmatter.widget.WidgetSyncState.FAILED; else -> top.zwtx.daysmatter.widget.WidgetSyncState.CACHED })
     }
-    top.zwtx.daysmatter.widget.ImportantDayWidgetProvider.updateAll(context)
+    top.zwtx.daysmatter.widget.WidgetUpdates.redraw(context, clock.instant())
+    top.zwtx.daysmatter.widget.WidgetRefreshScheduler.ensureScheduled(context)
   }
 
   private fun completeOperation(owner: Session?) {

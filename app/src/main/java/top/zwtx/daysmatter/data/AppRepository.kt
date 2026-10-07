@@ -21,7 +21,9 @@ class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClien
     return Session.fromJson(data)
   }
 
-  suspend fun refresh(session: Session): Snapshot = coroutineScope {
+  suspend fun refresh(session: Session): Snapshot = SnapshotRequests.share(api.baseUrl, session) { fetchSnapshot(session) }
+
+  private suspend fun fetchSnapshot(session: Session): Snapshot = coroutineScope {
     val profile = async { api.objectData("GET", "/user/info", session) }
     val categories = async { api.arrayData("/categories", session) }
     val channels = async { api.arrayData("/remind-channels", session) }
@@ -36,11 +38,13 @@ class AppRepository(val store: LocalStore, private val api: ApiClient = ApiClien
   }
 
   suspend fun write(session: Session, method: String, path: String, body: JSONObject? = null): JSONObject =
-    api.objectData(method, path, session, body)
+    try { api.objectData(method, path, session, body) }
+    finally { SnapshotRequests.invalidate(api.baseUrl, session) }
 
   suspend fun exportData(session: Session): JSONObject = api.objectData("GET", "/data/export", session)
 
   suspend fun importData(session: Session, data: JSONObject) {
-    api.request("POST", "/data/import", session, data)
+    try { api.request("POST", "/data/import", session, data) }
+    finally { SnapshotRequests.invalidate(api.baseUrl, session) }
   }
 }
