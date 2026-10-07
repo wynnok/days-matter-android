@@ -60,6 +60,24 @@ class DeviceManagementScreenTest {
     compose.onNodeWithText("测试通知").performScrollTo().performClick()
     compose.onNodeWithText("请先授予通知权限").assertExists()
   }
+  @Test fun desktopManagementOpensSystemConfigurationForSelectedInstance() {
+    login()
+    val manager = android.appwidget.AppWidgetManager.getInstance(app)
+    val id = shadowOf(manager).createWidget(top.zwtx.daysmatter.widget.ImportantDayWidgetProvider::class.java,
+      R.layout.important_day_widget)
+    top.zwtx.daysmatter.widget.WidgetStore(app).bind(id,
+      EventTarget(BuildConfig.API_BASE_URL.trimEnd('/'), 7, 11))
+    compose.onNodeWithText("我的").performClick()
+    compose.onNodeWithText("重要日子").performScrollTo().performClick()
+    compose.onNodeWithText("实例 $id · 目标事件").performScrollTo().assertExists()
+    compose.onNodeWithText("配置实例 $id").performScrollTo().performClick()
+    compose.runOnIdle {
+      val opened = shadowOf(activityContext as android.app.Activity).nextStartedActivity
+      assertEquals(top.zwtx.daysmatter.widget.WidgetConfigurationActivity::class.java.name, opened.component?.className)
+      assertEquals(id, opened.getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, -1))
+    }
+  }
+
   private fun openReminders() {
     compose.onNodeWithText("我的").performClick()
     compose.onNodeWithText("本地提醒").performScrollTo().performClick()
