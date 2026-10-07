@@ -606,7 +606,7 @@ fun ConfirmDeleteDialog(title: String, body: String, onDismiss: () -> Unit, onCo
 @Composable
 fun ProfileScreen(
   vm: MainViewModel, onChannels: () -> Unit,
-  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}, onLocalReminders: () -> Unit = {}, onCategories: () -> Unit = {},
+  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}, onLocalReminders: () -> Unit = {}, onCategories: () -> Unit = {}, onWidgets: () -> Unit = {},
   displaySnapshot: Snapshot? = vm.snapshot?.let { it.copy(events = it.events.map { event -> event.forDisplay() }) }
 ) {
   val profile = displaySnapshot?.profile
@@ -695,6 +695,9 @@ fun ProfileScreen(
       SettingsRow("分类管理", "管理分类名称、颜色与图标", onCategories)
       HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
       SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
+    }
+    SettingsGroup("桌面小组件") {
+      SettingsRow("重要日子", "添加说明与已有实例配置", onWidgets)
     }
     SettingsGroup("关于与帮助") {
       SettingsRow("帮助与关于", "日期、备份、提醒及版本声明", onHelp)

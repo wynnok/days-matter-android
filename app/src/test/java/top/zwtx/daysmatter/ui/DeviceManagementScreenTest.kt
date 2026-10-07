@@ -6,7 +6,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import com.sun.net.httpserver.HttpServer
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.*
@@ -20,9 +19,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import top.zwtx.daysmatter.*
 import top.zwtx.daysmatter.data.ApiClient
-import java.net.InetSocketAddress
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp")
@@ -32,39 +28,17 @@ class DeviceManagementScreenTest {
   private val reminderTime = androidx.compose.runtime.mutableStateOf<java.time.Instant?>(null)
   private lateinit var activityContext: android.content.Context
   private lateinit var vm: MainViewModel
-  private lateinit var server: HttpServer
-  private lateinit var backend: String
+  private lateinit var server: AccountTestServer
   private val app: Application get() = RuntimeEnvironment.getApplication()
-  @Volatile private var user = 7
-  @Volatile private var empty = false
-  @Volatile private var fail = false
-  private var release = CountDownLatch(0)
 
   @Before fun start() {
-    server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-    server.executor = java.util.concurrent.Executors.newCachedThreadPool()
-    server.createContext("/") { exchange ->
-      val isEvents = exchange.requestURI.path == "/events"
-      if (isEvents) release.await(5, TimeUnit.SECONDS)
-      val data: Any = when (exchange.requestURI.path) {
-        "/auth/login" -> JSONObject().put("user_id", user).put("name", "账号$user")
-          .put("email", "test@example.com").put("token", "synthetic-token")
-        "/user/info" -> JSONObject().put("nickname", "账号$user").put("email", "test@example.com")
-        "/events" -> if (empty) JSONArray() else JSONArray().put(JSONObject().put("event_id", 11)
-          .put("event_name", "目标事件").put("server_next_occurrence", "2099-10-20"))
-          .put(JSONObject().put("event_id", 12).put("event_name", "过期重复事件").put("repeat_type", 4).put("server_next_occurrence", "2000-01-01"))
-          .put(JSONObject().put("event_id", 13).put("event_name", "过去事件").put("server_next_occurrence", "2000-01-01"))
-          .put(JSONObject().put("event_id", 14).put("event_name", "未知日期事件"))
-        else -> JSONArray()
-      }
-      val code = if (isEvents && fail) 503 else 200
-      val bytes = JSONObject().put("code", code).put("message", "测试同步失败").put("data", data).toString().toByteArray()
-      exchange.sendResponseHeaders(code, bytes.size.toLong())
-      exchange.responseBody.use { it.write(bytes) }
+    server = AccountTestServer().apply {
+      events = JSONArray().put(JSONObject().put("event_id", 11).put("event_name", "目标事件").put("server_next_occurrence", "2099-10-20"))
+        .put(JSONObject().put("event_id", 12).put("event_name", "过期重复事件").put("repeat_type", 4).put("server_next_occurrence", "2000-01-01"))
+        .put(JSONObject().put("event_id", 13).put("event_name", "过去事件").put("server_next_occurrence", "2000-01-01"))
+        .put(JSONObject().put("event_id", 14).put("event_name", "未知日期事件"))
     }
-    server.start()
-    backend = "http://127.0.0.1:${server.address.port}"
-    compose.runOnIdle { vm = MainViewModel(app, ApiClient(backend)) }
+    compose.runOnIdle { vm = MainViewModel(app, ApiClient(server.baseUrl)) }
     compose.setContent { activityContext = androidx.compose.ui.platform.LocalContext.current; DaysMatterTheme(false) {
       if (reminderTime.value == null) DaysMatterApp(vm) else {
         LocalReminderScreen(vm, {}, androidx.compose.foundation.layout.PaddingValues(), reminderTime.value!!)
@@ -72,18 +46,11 @@ class DeviceManagementScreenTest {
     } }
   }
 
-  @After fun stop() {
-    release.countDown()
-    server.stop(0)
-    (server.executor as java.util.concurrent.ExecutorService).shutdownNow()
-  }
+  @After fun stop() { server.close() }
   private fun waitForRequest() = compose.waitUntil(5_000) {
     shadowOf(Looper.getMainLooper()).idle(); !vm.busy
   }
   private fun login() { compose.runOnIdle { vm.login("test@example.com", "password") }; waitForRequest() }
-  private fun open(id: Int = 11, service: String = backend) {
-    compose.runOnIdle { vm.openEvent(EventTarget(service, 7, id).intent(app)) }
-  }
 
   @Test fun localReminderManagementIsReachableFromMyPage() {
     login()

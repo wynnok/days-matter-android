@@ -224,6 +224,13 @@ internal fun DaysMatterApp(vm: MainViewModel) {
       vm.consumeEventNavigation()
     }
   }
+  LaunchedEffect(vm.eventCreationNavigation) {
+    if (vm.eventCreationNavigation && vm.session != null) {
+      eventId = 0
+      page = "event_form"
+      vm.consumeEventCreation()
+    }
+  }
   LaunchedEffect(vm.message) {
     vm.message?.let {
       snackbar.showSnackbar(it)
@@ -260,7 +267,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
       "category_form" -> "categories"
       "channel_form" -> "channels"
       "event_detail" -> "home"
-      "channels", "help", "local_reminders", "categories" -> "profile"
+      "channels", "help", "local_reminders", "categories", "widgets" -> "profile"
       else -> "home"
     }
   }
@@ -275,6 +282,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
     "event_detail" -> "倒数日详情"
     "event_form" -> if (eventId == 0) "添加倒数日" else "编辑倒数日"
     "sub_form" -> if (subEventId == 0) "添加子事件" else "编辑子事件"
+    "widgets" -> "桌面小组件"
     "categories" -> "分类管理"
     "category_form" -> if (editingCategoryId == 0) "添加分类" else "编辑分类"
     "local_reminders" -> "本地提醒"
@@ -355,6 +363,7 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               onHelp = { page = "help" },
               onLocalReminders = { page = "local_reminders" },
               onCategories = { page = "categories" },
+              onWidgets = { page = "widgets" },
               displaySnapshot = displaySnapshot,
               contentPadding = screenPadding
             )
@@ -377,6 +386,8 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               vm, eventId, subEventId.takeIf { it != 0 },
               onSaved = { page = "event_detail" }, contentPadding = screenPadding
             )
+            "widgets" -> top.zwtx.daysmatter.ui.WidgetManagementScreen(vm,
+              onConfigure = { context.startActivity(top.zwtx.daysmatter.widget.ImportantDayWidgetProvider.configurationIntent(context, it)) }, padding = screenPadding)
             "categories" -> top.zwtx.daysmatter.ui.CategoryListScreen(vm,
               onAdd = { editingCategoryId = 0; page = "category_form" },
               onEdit = { editingCategoryId = it; page = "category_form" }, contentPadding = screenPadding)
