@@ -56,7 +56,7 @@ class WidgetBackgroundRefreshTest {
     }
     WidgetUpdates.redraw(app, Instant.parse("2026-10-10T00:00:00Z"))
     assertEquals("已过 2 天", text(fixed, R.id.widget_days))
-    assertEquals("近期无已确认日程", text(recent, R.id.upcoming_row_1))
+    assertEquals("近期无已确认日程", text(recent, R.id.upcoming_empty_title))
     val jobs = app.getSystemService(JobScheduler::class.java).allPendingJobs
     assertTrue(jobs.any { it.isPeriodic && it.intervalMillis >= 3_600_000 && it.isPersisted })
     assertTrue(jobs.any { !it.isPeriodic && it.networkType == android.app.job.JobInfo.NETWORK_TYPE_ANY })
@@ -79,7 +79,7 @@ class WidgetBackgroundRefreshTest {
     assertTrue(WidgetSyncJobService.synchronize(app, ApiClient(server.baseUrl), Clock.fixed(now.plusSeconds(7200), ZoneOffset.UTC)))
     assertNull(store.loadSession())
     assertEquals("请登录以查看重要日子", text(fixed, R.id.widget_days))
-    assertEquals("请登录以查看近期日程", text(recent, R.id.upcoming_row_1))
+    assertEquals("请登录以查看近期日程", text(recent, R.id.upcoming_empty_title))
   }
   @Test(timeout = 20_000) fun overlappingInstancesShareOneAccountFetchAndLateOldOwnerCannotOverwriteNewAccount() = runBlocking {
     server.eventsPaused = java.util.concurrent.CountDownLatch(1)
@@ -99,7 +99,7 @@ class WidgetBackgroundRefreshTest {
     assertEquals(8, store.loadSession()!!.userId)
     assertEquals("已确认缓存", store.loadSnapshot(7)!!.events.single().name)
     assertEquals("请登录所属账号或重新配置", text(fixed, R.id.widget_days))
-    assertEquals("请登录所属账号或重新配置", text(recent, R.id.upcoming_row_1))
+    assertEquals("请登录所属账号或重新配置", text(recent, R.id.upcoming_empty_title))
   }
   @Test(timeout = 20_000) fun stoppedBackgroundSyncDoesNotCancelForegroundAccountRefresh() = runBlocking {
     server.eventsPaused = java.util.concurrent.CountDownLatch(1)
@@ -129,7 +129,7 @@ class WidgetBackgroundRefreshTest {
     assertEquals("待同步下一次日期", text(fixed, R.id.widget_days))
     assertEquals("本次日期：2026-10-08", text(fixed, R.id.widget_date))
     assertTrue(text(recent, R.id.upcoming_status).contains("1 个日期待同步"))
-    assertEquals("近期无已确认日程", text(recent, R.id.upcoming_row_1))
+    assertEquals("近期无已确认日程", text(recent, R.id.upcoming_empty_title))
     assertTrue(text(recent, R.id.upcoming_status).contains("离线缓存"))
   }
 

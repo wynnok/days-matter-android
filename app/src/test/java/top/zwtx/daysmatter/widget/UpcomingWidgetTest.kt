@@ -52,9 +52,9 @@ class UpcomingWidgetTest {
     WidgetStore(app).saveUpcoming(id, UpcomingBinding(BuildConfig.API_BASE_URL, 7, 7, 1))
     UpcomingWidgetProvider.update(app, id, now)
     val view = shadowOf(manager).getViewFor(id)
-    assertEquals("10/07 · 今天 · 今天", view.findViewById<TextView>(R.id.upcoming_row_1).text.toString())
-    assertEquals("10/13 · 还有 6 天 · Z置顶", view.findViewById<TextView>(R.id.upcoming_row_2).text.toString())
-    assertEquals("10/13 · 还有 6 天 · A普通", view.findViewById<TextView>(R.id.upcoming_row_3).text.toString())
+    assertEquals("今天", view.findViewById<TextView>(R.id.upcoming_row_1).text.toString())
+    assertEquals("Z置顶", view.findViewById<TextView>(R.id.upcoming_row_2).text.toString())
+    assertEquals("A普通", view.findViewById<TextView>(R.id.upcoming_row_3).text.toString())
     assertTrue(view.findViewById<TextView>(R.id.upcoming_status).text.contains("1 个日期待同步"))
     view.findViewById<TextView>(R.id.upcoming_row_2).performClick()
     val opened = shadowOf(app).nextStartedActivity
@@ -65,7 +65,7 @@ class UpcomingWidgetTest {
     manager.updateAppWidgetOptions(id, android.os.Bundle().apply { putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 400) })
     WidgetStore(app).saveUpcoming(id, UpcomingBinding(BuildConfig.API_BASE_URL, 7, 30, 1))
     UpcomingWidgetProvider.update(app, id, now)
-    assertEquals("11/05 · 还有 29 天 · 三十天边界", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_row_5).text.toString())
+    assertEquals("三十天边界", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_row_5).text.toString())
     assertFalse(shadowOf(manager).getViewFor(id).contentDescription.toString().contains("远期置顶"))
   }
   @Test fun deletedCategoryRequiresReselectionAndNeverChangesImportantDayBinding() {
@@ -77,13 +77,13 @@ class UpcomingWidgetTest {
     WidgetStore(app).bind(fixed, EventTarget(BuildConfig.API_BASE_URL, 7, 2))
     UpcomingWidgetProvider.update(app, id, now)
     ImportantDayWidgetProvider.update(app, fixed, now)
-    assertEquals("分类已删除，请重新选择", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_row_1).text.toString())
+    assertEquals("分类已删除，请重新选择", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_empty_title).text.toString())
     assertEquals("今天", shadowOf(manager).getViewFor(fixed).findViewById<TextView>(R.id.widget_name).text.toString())
     shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_title).performClick()
     assertEquals(WidgetConfigurationActivity::class.java.name, shadowOf(app).nextStartedActivity.component?.className)
     LocalStore(app).saveSession(Session(8, "Other", "other@example.com", "synthetic"))
     UpcomingWidgetProvider.update(app, id, now)
-    assertEquals("请登录所属账号或重新配置", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_row_1).text.toString())
+    assertEquals("请登录所属账号或重新配置", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_empty_title).text.toString())
     assertFalse(shadowOf(manager).getViewFor(id).contentDescription.toString().contains("今天"))
   }
 
@@ -108,23 +108,20 @@ class UpcomingWidgetTest {
       view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY),
         android.view.View.MeasureSpec.makeMeasureSpec(height, android.view.View.MeasureSpec.EXACTLY))
       view.layout(0, 0, width, height)
-      listOf(R.id.upcoming_row_1 to "今天", R.id.upcoming_row_2 to "还有 6 天").forEach { (rowId, countdown) ->
+      listOf(Triple(R.id.upcoming_row_1, R.id.upcoming_date_1, R.id.upcoming_days_1),
+        Triple(R.id.upcoming_row_2, R.id.upcoming_date_2, R.id.upcoming_days_2)).forEachIndexed { index, (rowId, dateId, daysId) ->
         val row = view.findViewById<TextView>(rowId)
-        val content = row.text.toString()
-        assertTrue("日程不能绘制被裁切的半行", row.layout.getLineBottom(row.layout.lineCount - 1) <= row.height)
-        val namePrefix = if (rowId == R.id.upcoming_row_1) "很长" else "另一个"
-        listOf(content.substring(0, 5), countdown, namePrefix).forEach { required ->
-          val start = content.indexOf(required)
-          assertTrue(start >= 0)
-          val end = start + required.length
-          val line = row.layout.getLineForOffset(end - 1)
-          assertTrue("$width × $height：$required 必须可见（行底=${row.layout.getLineBottom(line)}，高度=${row.height}，字体=${row.textSize}）", row.layout.getLineBottom(line) <= row.height)
-          val cutoff = row.layout.getLineStart(line) + row.layout.getEllipsisStart(line)
-          assertTrue("长名称不能挤掉 $required", row.layout.getEllipsisCount(line) == 0 || end <= cutoff)
+        val date = view.findViewById<TextView>(dateId)
+        val days = view.findViewById<TextView>(daysId)
+        assertTrue(row.text.startsWith(if (index == 0) "很长" else "另一个"))
+        assertEquals(if (index == 0) "10/07" else "10/13", date.text.toString())
+        assertEquals(if (index == 0) "今天" else "6 天", days.text.toString())
+        listOf(row, date, days).forEach { text ->
+          assertTrue("$width × $height：${text.text} 日程不能绘制被裁切的半行（行底=${text.layout.getLineBottom(0)}，高度=${text.height}，字体=${text.textSize}）", text.layout.getLineBottom(0) <= text.height)
+          if (text != row) assertEquals("长名称不能挤掉日期和倒数", 0, text.layout.getEllipsisCount(0))
         }
         assertTrue(row.performClick())
-        assertEquals(if (rowId == R.id.upcoming_row_1) 2 else 3,
-          shadowOf(app).nextStartedActivity.getIntExtra("event_id", 0))
+        assertEquals(if (index == 0) 2 else 3, shadowOf(app).nextStartedActivity.getIntExtra("event_id", 0))
       }
       val title = view.findViewById<TextView>(R.id.upcoming_title)
       assertTrue(title.layout.getLineBottom(0) <= title.height)
@@ -159,7 +156,7 @@ class UpcomingWidgetTest {
       val row = view.findViewById<TextView>(R.id.upcoming_row_1)
       assertTrue(row.height > 0)
       assertTrue(row.top + row.height <= height)
-      assertTrue(row.text.toString().startsWith("10/07"))
+      assertEquals("10/07", view.findViewById<TextView>(R.id.upcoming_date_1).text.toString())
       assertTrue(row.performClick())
       assertEquals(2, shadowOf(app).nextStartedActivity.getIntExtra("event_id", 0))
       val output = java.io.File("build/widget-previews").apply { mkdirs() }
@@ -167,6 +164,45 @@ class UpcomingWidgetTest {
       view.draw(android.graphics.Canvas(bitmap))
       java.io.File(output, "upcoming-${width}x${height}-large-font.png").outputStream().use {
         bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+      }
+    }
+  }
+
+  @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+  fun populatedAndEmptyCardsRetainRoundedBackgroundsInBothAppearances() {
+    seed()
+    val id = allocate()
+    val binding = UpcomingBinding(BuildConfig.API_BASE_URL, 7, 30)
+    val raw = LocalStore(app).loadSnapshot(7)!!.raw
+    val events = raw.getJSONArray("events")
+    events.getJSONObject(1).put("event_name", "周末小聚")
+    events.getJSONObject(2).put("event_name", "妈妈的生日")
+    events.getJSONObject(3).put("event_name", "新的旅行计划")
+    LocalStore(app).saveSnapshot(7, Snapshot.fromJson(raw))
+    for (empty in listOf(false, true)) {
+      if (empty) {
+        raw.put("events", JSONArray())
+        LocalStore(app).saveSnapshot(7, Snapshot.fromJson(raw))
+      }
+      for (mode in listOf(AppearanceMode.LIGHT, AppearanceMode.DARK)) {
+        val parent = android.widget.FrameLayout(app)
+        val view = UpcomingWidgetProvider.render(app, id, now, binding, mode, previewHeight = 180).apply(app, parent)
+        val width = 340
+        val height = 180
+        view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY),
+          android.view.View.MeasureSpec.makeMeasureSpec(height, android.view.View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, width, height)
+        assertEquals(if (empty) android.view.View.VISIBLE else android.view.View.GONE,
+          view.findViewById<android.view.View>(R.id.upcoming_empty).visibility)
+        val bitmap = android.graphics.Bitmap.createBitmap(width * 3, height * 3, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.scale(3f, 3f)
+        view.draw(canvas)
+        assertEquals("显式外观不能把圆角背景替换成矩形", 0, android.graphics.Color.alpha(bitmap.getPixel(0, 0)))
+        val output = java.io.File("build/widget-previews").apply { mkdirs() }
+        java.io.File(output, "upcoming-${if (empty) "empty" else "populated"}-${mode.name.lowercase()}.png").outputStream().use {
+          bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
       }
     }
   }

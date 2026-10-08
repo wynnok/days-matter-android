@@ -156,7 +156,7 @@ class CrudScreenTest {
     rejectWrite = true
     compose.onNodeWithText("保存分类").performScrollTo().performClick()
     waitForData()
-    compose.onNodeWithText("未保存草稿").assertExists()
+    compose.onNode(hasText("未保存草稿") and hasSetTextAction()).assertExists()
     compose.onNodeWithText("名称被拒绝").assertExists()
     compose.onNodeWithText("已提交").assertDoesNotExist()
   }

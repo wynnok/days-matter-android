@@ -126,7 +126,7 @@ class ChannelScreenTest {
 
   @Test fun toggleShowsReferencesAndConfirmedStateWhenRefreshFails() {
     showList()
-    compose.onNodeWithText("站外提醒").assertExists()
+    compose.onNodeWithText("账号提醒").assertExists()
     compose.onNodeWithText("被 1 个事件引用").assertExists()
     failRefresh = true
     releaseWrite = CountDownLatch(1)
@@ -165,7 +165,7 @@ class ChannelScreenTest {
     showList()
     compose.onNodeWithContentDescription("停用测试渠道").performClick()
     waitForIdle()
-    compose.onNodeWithContentDescription("删除渠道").performClick()
+    compose.onNodeWithContentDescription("删除渠道").performScrollTo().performClick()
     compose.onNodeWithText("删除", useUnmergedTree = true).performClick()
     compose.onNodeWithText("请先关闭使用此渠道的事件提醒").assertExists()
     assertEquals(1, writes.get())

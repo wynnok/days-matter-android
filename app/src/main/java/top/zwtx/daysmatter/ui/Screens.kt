@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
@@ -28,6 +29,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Upload
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Webhook
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Person
@@ -606,7 +616,7 @@ fun ConfirmDeleteDialog(title: String, body: String, onDismiss: () -> Unit, onCo
 @Composable
 fun ProfileScreen(
   vm: MainViewModel, onChannels: () -> Unit,
-  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}, onLocalReminders: () -> Unit = {}, onCategories: () -> Unit = {}, onWidgets: () -> Unit = {},
+  onExport: () -> Unit, onImport: () -> Unit, contentPadding: PaddingValues, onHelp: () -> Unit = {}, onLocalReminders: () -> Unit = {}, onWidgets: () -> Unit = {},
   displaySnapshot: Snapshot? = vm.snapshot?.let { it.copy(events = it.events.map { event -> event.forDisplay() }) }
 ) {
   val profile = displaySnapshot?.profile
@@ -670,17 +680,26 @@ fun ProfileScreen(
       }
     }
     SettingsGroup("提醒与权限") {
-      SettingsRow("本地提醒", "当前设备的通知、权限与测试", onLocalReminders)
+      SettingsRow("本地提醒", "当前设备的通知、权限与测试", Icons.Outlined.NotificationsNone, onLocalReminders)
       HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-      SettingsRow("站外提醒", "配置 Webhook 提醒渠道", onChannels)
+      SettingsRow("站外提醒", "配置 Webhook 提醒渠道", Icons.Outlined.Webhook, onChannels)
     }
     SettingsGroup("数据与同步") {
-      SettingsRow("同步状态与重试", syncStatus, vm::refresh)
+      Column(Modifier.fillMaxWidth().padding(AppDimens.cardInset), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("账号数据", style = MaterialTheme.typography.titleSmall)
+        Text(syncStatus, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = vm::refresh, enabled = !vm.busy,
+          modifier = Modifier.fillMaxWidth().heightIn(min = AppDimens.controlHeight)) {
+          Icon(Icons.Outlined.CloudSync, null, Modifier.size(18.dp))
+          Spacer(Modifier.width(8.dp))
+          Text(if (vm.refreshing) "同步中…" else "同步账号数据")
+        }
+      }
       HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          SettingsRow("导出数据", "保存账号 JSON 备份") { confirmingExport = true }
+          SettingsRow("导出数据", "保存账号 JSON 备份", Icons.Outlined.Download) { confirmingExport = true }
           if (vm.lastExport > 0) Text("最近导出：已保存 · ${formatSyncTime(vm.lastExport)}", modifier = Modifier.padding(16.dp))
           HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-          SettingsRow("导入数据", "从 JSON 备份追加数据", onImport)
+          SettingsRow("导入数据", "从 JSON 备份追加数据", Icons.Outlined.Upload, onImport)
           if (vm.importOutcome == top.zwtx.daysmatter.data.ImportOutcome.UNKNOWN || vm.importOutcome == top.zwtx.daysmatter.data.ImportOutcome.REFRESH_FAILED) {
             Column(Modifier.padding(16.dp)) {
               Text(if (vm.importOutcome == top.zwtx.daysmatter.data.ImportOutcome.UNKNOWN) "导入结果未知，可能已追加。先查看并核实账号数据，避免重复导入。" else "导入请求已完成，账号数据尚未刷新。")
@@ -691,16 +710,14 @@ fun ProfileScreen(
             }
           }
     }
-    SettingsGroup("分类与偏好") {
-      SettingsRow("分类管理", "管理分类名称、颜色与图标", onCategories)
-      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-      SettingsRow("外观", appearanceLabel) { choosingAppearance = true }
+    SettingsGroup("设备偏好") {
+      SettingsRow("外观", appearanceLabel, Icons.Outlined.Palette) { choosingAppearance = true }
     }
     SettingsGroup("桌面小组件") {
-      SettingsRow("管理桌面小组件", "添加说明与已有实例配置", onWidgets)
+      SettingsRow("管理桌面小组件", "添加说明与已有实例配置", Icons.Outlined.Widgets, onWidgets)
     }
     SettingsGroup("关于与帮助") {
-      SettingsRow("帮助与关于", "日期、备份、提醒及版本声明", onHelp)
+      SettingsRow("帮助与关于", "日期、备份、提醒及版本声明", Icons.Outlined.HelpOutline, onHelp)
     }
     OutlinedButton(onClick = vm::logout, modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)) {
       Text("退出登录")
@@ -708,17 +725,24 @@ fun ProfileScreen(
     Spacer(Modifier.height(floatingTabContentClearance()))
   }
   if (confirmingExport) {
-    AlertDialog(onDismissRequest = { confirmingExport = false }, title = { Text("导出账号备份") },
-      text = { Text("包含分类、渠道信息、主事件和子事件，可能含 Webhook 地址与凭据，请妥善保管。不包含账号资料、本地提醒、外观或小组件实例。") },
-      confirmButton = { TextButton(onClick = { confirmingExport = false; onExport() }, enabled = !vm.busy) { Text("选择保存位置") } },
+    AlertDialog(onDismissRequest = { confirmingExport = false }, icon = { Icon(Icons.Outlined.Download, null) },
+      title = { Text("导出账号备份") },
+      text = { Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("把账号中的日子保存为 JSON 文件。", style = MaterialTheme.typography.bodyMedium)
+        BackupScope()
+        SettingsNote("可能包含 Webhook 地址与凭据，请妥善保管。")
+      } },
+      confirmButton = { Button(onClick = { confirmingExport = false; onExport() }, enabled = !vm.busy) { Text("选择保存位置") } },
       dismissButton = { TextButton(onClick = { confirmingExport = false }) { Text("取消") } })
   }
   if (editing) {
     AlertDialog(
       onDismissRequest = { if (!vm.savingProfile) editing = false },
+      icon = { Icon(Icons.Default.Person, null) },
       title = { Text("编辑资料") },
       text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+          Text("昵称用于展示，邮箱用于登录。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           OutlinedTextField(nickname, { nickname = it }, label = { FormFieldLabel("昵称", required = true) },
             shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(), enabled = !vm.savingProfile)
           OutlinedTextField(email, { email = it }, label = { FormFieldLabel("邮箱", required = true) },
@@ -726,7 +750,7 @@ fun ProfileScreen(
         }
       },
       confirmButton = {
-        TextButton(onClick = {
+        Button(onClick = {
           if (nickname.isBlank() || email.isBlank()) {
             vm.showMessage("昵称和邮箱不能为空")
           } else {
@@ -740,15 +764,18 @@ fun ProfileScreen(
   if (choosingAppearance) {
     AlertDialog(
       onDismissRequest = { choosingAppearance = false },
+      icon = { Icon(Icons.Outlined.Palette, null) },
       title = { Text("外观") },
       text = {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text("仅应用于当前设备；小组件可单独设置配色。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           listOf(
             Triple(AppearanceMode.LIGHT, "浅色模式", "始终使用浅色外观"),
             Triple(AppearanceMode.DARK, "深色模式", "始终使用深色外观"),
             Triple(AppearanceMode.SYSTEM, "跟随系统", "随设备设置自动切换")
           ).forEach { (mode, title, description) ->
             Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+              .background(if (vm.appearanceMode == mode) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface)
               .selectable(selected = vm.appearanceMode == mode, role = Role.RadioButton) {
                 vm.updateAppearanceMode(mode)
                 choosingAppearance = false
@@ -772,18 +799,20 @@ fun ProfileScreen(
 @Composable
 private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-    Text(title, style = MaterialTheme.typography.titleMedium)
+    Text(title, Modifier.padding(start = 4.dp), style = MaterialTheme.typography.titleSmall)
     GlassPanel { Column { content() } }
   }
 }
 
 @Composable
-private fun SettingsRow(title: String, subtitle: String, onClick: () -> Unit) {
+private fun SettingsRow(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
   Row(Modifier.fillMaxWidth().clickable(onClick = onClick)
     .padding(horizontal = AppDimens.cardInset, vertical = 14.dp),
-    verticalAlignment = Alignment.CenterVertically) {
-    Column(Modifier.weight(1f)) {
-      Text(title, style = MaterialTheme.typography.titleMedium)
+    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+      contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary) }
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+      Text(title, style = MaterialTheme.typography.titleSmall)
       Text(subtitle, style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

@@ -4,7 +4,9 @@ import android.app.Application
 import android.os.Looper
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollTo
 import org.json.JSONArray
 import org.json.JSONObject
@@ -56,7 +58,7 @@ class DeviceManagementScreenTest {
     login()
     compose.onNodeWithText("我的").performClick()
     compose.onNodeWithText("本地提醒").performScrollTo().performClick()
-    compose.onNodeWithText("通知权限：未授予").assertExists()
+    compose.onNode(hasText("通知权限") and hasText("未授予")).assertExists()
     compose.onNodeWithText("测试通知").performScrollTo().performClick()
     compose.onNodeWithText("请先授予通知权限").assertExists()
   }
@@ -74,8 +76,8 @@ class DeviceManagementScreenTest {
     compose.onNodeWithText("我的").performClick()
     compose.onNodeWithText("退出登录").performScrollTo()
     compose.onNodeWithText("管理桌面小组件").performClick()
-    compose.onNodeWithText("重要日子 · 实例 $id · 目标事件").performScrollTo().assertExists()
-    compose.onNodeWithText("配置实例 $id").performScrollTo().performClick()
+    compose.onNodeWithText("目标事件").performScrollTo().assertExists()
+    compose.onNodeWithText("调整内容与外观").performScrollTo().performClick()
     compose.runOnIdle {
       val opened = shadowOf(activityContext as android.app.Activity).nextStartedActivity
       assertEquals(top.zwtx.daysmatter.widget.WidgetConfigurationActivity::class.java.name, opened.component?.className)
@@ -105,7 +107,7 @@ class DeviceManagementScreenTest {
     shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
     login()
     openReminders()
-    compose.onNodeWithText("通知权限：已授予").assertExists()
+    compose.onNode(hasText("通知权限") and hasText("已授予")).assertExists()
     compose.onNodeWithText("测试通知").performScrollTo().performClick()
     val notifications = app.getSystemService(android.app.NotificationManager::class.java)
     compose.runOnIdle {
@@ -126,7 +128,7 @@ class DeviceManagementScreenTest {
     shadowOf(notifications).setNotificationsEnabled(false)
     login()
     openReminders()
-    compose.onNodeWithText("系统应用通知：已关闭").assertExists()
+    compose.onNode(hasText("系统应用通知") and hasText("已关闭")).assertExists()
     compose.onNodeWithText("测试通知").performScrollTo().performClick()
     compose.onNodeWithText("系统应用通知已关闭，请在系统设置中开启").assertExists()
     assertEquals(0, shadowOf(notifications).allNotifications.size)
@@ -138,7 +140,7 @@ class DeviceManagementScreenTest {
     notifications.createNotificationChannel(android.app.NotificationChannel("event_reminders", "事件提醒", android.app.NotificationManager.IMPORTANCE_NONE))
     login()
     openReminders()
-    compose.onNodeWithText("事件提醒渠道：已关闭").assertExists()
+    compose.onNode(hasText("事件提醒渠道") and hasText("已关闭")).assertExists()
     compose.onNodeWithText("测试通知").performScrollTo().performClick()
     compose.onNodeWithText("事件提醒渠道已关闭，请在系统设置中开启").assertExists()
     assertEquals(0, shadowOf(notifications).allNotifications.size)
@@ -152,15 +154,18 @@ class DeviceManagementScreenTest {
     compose.onNodeWithText("本次提醒时间已过，无法据此判断之前是否送达").assertExists()
     compose.onNodeWithText("下一次已知提醒：2099-10-19 09:00（东八区）").assertDoesNotExist()
   }
-  @Test fun profileUsesSharedSummaryAndProvidesGroupedCategoryManagement() {
+  @Test fun profileUsesSharedSummaryAndKeepsCategoryManagementInHomeDrawer() {
     login()
     compose.onNodeWithText("我的").performClick()
     compose.onNodeWithText("事件总数 4 · 近期 7 天 0").assertExists()
     compose.onNodeWithText("其中 2 个事件日期待同步").assertExists()
-    for (group in listOf("提醒与权限", "数据与同步", "分类与偏好", "关于与帮助")) {
+    for (group in listOf("提醒与权限", "数据与同步", "设备偏好", "关于与帮助")) {
       compose.onNodeWithText(group).performScrollTo().assertExists()
     }
-    compose.onNodeWithText("分类管理").performScrollTo().performClick()
+    compose.onNodeWithText("分类管理").assertDoesNotExist()
+    compose.onNodeWithText("记录").performClick()
+    compose.onNodeWithContentDescription("打开分类抽屉").performClick()
+    compose.onNodeWithText("管理分类").performClick()
     compose.onNodeWithText("添加分类").assertExists()
     compose.onNodeWithText("添加分类").performClick()
     compose.onNodeWithText("分类名称", substring = true).assertExists()

@@ -1,6 +1,16 @@
 package top.zwtx.daysmatter.ui
 
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -18,9 +28,14 @@ fun BackupImportDialog(vm: MainViewModel) {
       dismissButton = { TextButton(onClick = vm::viewImportedData, enabled = !vm.busy) { Text("查看账号数据") } })
   }
   vm.importPreview?.let { preview ->
-    AlertDialog(onDismissRequest = vm::cancelImport, title = { Text("确认追加导入") },
-      text = { Text("${preview.summary}\n以上是文件数量，并非实际导入数。追加、不覆盖，可能重复；不恢复本地提醒、外观或小组件实例。") },
-      confirmButton = { TextButton(onClick = vm::confirmImport, enabled = !vm.busy) { Text(if (vm.busy) "导入中…" else "确认追加") } },
+    AlertDialog(onDismissRequest = vm::cancelImport, icon = { Icon(Icons.Outlined.Upload, null) }, title = { Text("确认追加导入") },
+      text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("备份文件中的数据", style = MaterialTheme.typography.labelLarge)
+        BackupCounts(preview.data.getJSONObject("data"))
+        Text("追加，不覆盖现有数据", style = MaterialTheme.typography.titleSmall)
+        SettingsNote("以上是文件数量，并非实际导入数。重复导入可能产生重复数据；不恢复本地提醒、外观或小组件实例。")
+      } },
+      confirmButton = { Button(onClick = vm::confirmImport, enabled = !vm.busy) { Text(if (vm.busy) "导入中…" else "确认追加") } },
       dismissButton = { TextButton(onClick = vm::cancelImport, enabled = !vm.busy) { Text("取消") } })
   }
 }

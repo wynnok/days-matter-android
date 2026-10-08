@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Webhook
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
@@ -112,38 +114,51 @@ fun CategoryEditorScreen(vm: MainViewModel, categoryId: Int?, onSaved: () -> Uni
       .padding(AppDimens.drawerInnerGutter),
     verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)
   ) {
-    OutlinedTextField(name, { name = it }, label = { FormFieldLabel("分类名称", required = true) },
-      singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
-    Text("颜色", style = MaterialTheme.typography.titleMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      colors.forEach { option ->
-        Box(
-          Modifier.size(AppDimens.controlHeight).clickable { color = option },
-          contentAlignment = Alignment.Center
-        ) {
-          Box(Modifier.size(36.dp).clip(MaterialTheme.shapes.small)
-            .background(categoryColor(option)), contentAlignment = Alignment.Center) {
-            if (color == option) Text("✓", color = androidx.compose.ui.graphics.Color.White)
+    GlassPanel {
+      Row(Modifier.fillMaxWidth().padding(AppDimens.cardInset), verticalAlignment = Alignment.CenterVertically) {
+        CategoryIcon(icon, color, size = 32.dp)
+        Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+          Text(name.ifBlank { "你的新分类" }, style = MaterialTheme.typography.titleMedium)
+          Text("颜色与图标实时预览", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+      }
+    }
+    FormSection("基本信息") {
+      OutlinedTextField(name, { name = it }, label = { FormFieldLabel("分类名称", required = true) },
+        singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+    }
+    FormSection("颜色") {
+      FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        colors.forEach { option ->
+          Box(
+            Modifier.size(AppDimens.controlHeight).clickable { color = option },
+            contentAlignment = Alignment.Center
+          ) {
+            Box(Modifier.size(36.dp).clip(MaterialTheme.shapes.small)
+              .background(categoryColor(option)), contentAlignment = Alignment.Center) {
+              if (color == option) Text("✓", color = androidx.compose.ui.graphics.Color.White)
+            }
           }
         }
       }
     }
-    Text("图标", style = MaterialTheme.typography.titleMedium)
-    OutlinedTextField(search, { search = it }, label = { Text("搜索图标，例如：生日、旅行、heart") },
-      shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
-    LazyVerticalGrid(
-      columns = GridCells.Adaptive(AppDimens.controlHeight), modifier = Modifier.fillMaxWidth().height(240.dp),
-      horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-      gridItems(icons) { id ->
-        FilterChip(
-          selected = icon == id, onClick = { icon = id },
-          label = { Icon(painterResource(CategoryIconResources.drawable(id)), id, tint = categoryColor(color)) },
-          modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)
-        )
+    FormSection("图标") {
+      OutlinedTextField(search, { search = it }, label = { Text("搜索图标") }, placeholder = { Text("生日、旅行、heart") },
+        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+      LazyVerticalGrid(
+        columns = GridCells.Adaptive(AppDimens.controlHeight), modifier = Modifier.fillMaxWidth().height(240.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        gridItems(icons) { id ->
+          FilterChip(
+            selected = icon == id, onClick = { icon = id },
+            label = { Icon(painterResource(CategoryIconResources.drawable(id)), id, tint = categoryColor(color)) },
+            modifier = Modifier.fillMaxWidth().height(AppDimens.controlHeight)
+          )
+        }
       }
     }
-    Text("已选：$icon", style = MaterialTheme.typography.bodySmall)
     Button(onClick = {
       if (name.isBlank()) {
         vm.showMessage("请填写分类名称")
@@ -177,42 +192,45 @@ private val iconKeywords = mapOf(
 fun ChannelListScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Int) -> Unit, contentPadding: PaddingValues) {
   val channels = vm.snapshot?.channels.orEmpty()
   var deleteId by remember { mutableStateOf<Int?>(null) }
-  Column(Modifier.fillMaxSize().padding(contentPadding)) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = AppDimens.pageGutter, vertical = AppDimens.itemGap),
-      verticalAlignment = Alignment.CenterVertically) {
-      Column(Modifier.weight(1f)) {
-        Text("站外提醒", style = MaterialTheme.typography.titleMedium)
-        Text("共 ${channels.size} 个 Webhook 渠道", style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant)
-      }
-      TextButton(onClick = onAdd) { Text("添加渠道") }
-    }
-    if (channels.isEmpty()) Text("还没有 Webhook 渠道，点击右上角添加",
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.padding(horizontal = AppDimens.pageGutter, vertical = AppDimens.sectionGap))
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap),
-      contentPadding = PaddingValues(horizontal = AppDimens.pageGutter, vertical = 4.dp)) {
-      items(channels, key = { it.id }) { channel ->
+  SettingsPage(contentPadding) {
+    SettingsHero(Icons.Outlined.Webhook, "账号提醒", "${channels.count { it.active }} 个渠道已启用",
+      "将重要日子的提醒，送到你常用的地方。")
+    Button(onClick = onAdd, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().heightIn(min = AppDimens.controlHeight)) { Text("添加渠道") }
+    if (channels.isEmpty()) SettingsSection("提醒渠道") {
+      SettingsEmpty(Icons.Outlined.Webhook, "还没有 Webhook 渠道", "添加后，在事件编辑页启用站外提醒。")
+    } else {
+      Text("已配置的渠道 · ${channels.size} 个", style = MaterialTheme.typography.titleSmall)
+      channels.forEach { channel ->
         GlassPanel {
-          Row(Modifier.padding(AppDimens.cardInset), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-              Text(channel.name, style = MaterialTheme.typography.titleSmall)
-              Text("${channel.format} · ${if (channel.active) "已启用" else "已停用"}", style = MaterialTheme.typography.bodySmall)
-              Text(channel.account, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-              Text(if (vm.snapshot?.raw?.optJSONArray("events") == null) "引用数量待获取" else
-                "被 ${vm.snapshot?.events.orEmpty().count { it.webhookEnabled && it.channelId == channel.id }} 个事件引用",
-                style = MaterialTheme.typography.bodySmall)
+          Column(Modifier.fillMaxWidth().padding(AppDimens.cardInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(channel.name, style = MaterialTheme.typography.titleMedium)
+                Text("${channel.format} · ${if (channel.active) "已启用" else "已停用"}", style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+              Switch(channel.active, { vm.setChannelActive(channel.id, it) }, enabled = !vm.busy,
+                modifier = Modifier.semantics { contentDescription = "${if (channel.active) "停用" else "启用"}${channel.name}" })
             }
-            Switch(channel.active, { vm.setChannelActive(channel.id, it) }, enabled = !vm.busy,
-              modifier = Modifier.semantics {
-                contentDescription = "${if (channel.active) "停用" else "启用"}${channel.name}"
-              })
-            IconButton(onClick = { onEdit(channel.id) }) { Icon(Icons.Default.Edit, "编辑渠道") }
-            IconButton(onClick = { deleteId = channel.id }) { Icon(Icons.Default.Delete, "删除渠道") }
+            Text(channel.account, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+              color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (vm.snapshot?.raw?.optJSONArray("events") == null) "引用数量待获取" else
+              "被 ${vm.snapshot?.events.orEmpty().count { it.webhookEnabled && it.channelId == channel.id }} 个事件引用",
+              style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+              OutlinedButton(onClick = { onEdit(channel.id) }, modifier = Modifier.weight(1f).heightIn(min = AppDimens.controlHeight)) {
+                Icon(Icons.Default.Edit, "编辑渠道", Modifier.size(17.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("编辑渠道")
+              }
+              IconButton(onClick = { deleteId = channel.id }) { Icon(Icons.Default.Delete, "删除渠道", tint = MaterialTheme.colorScheme.error) }
+            }
           }
         }
       }
     }
+    SettingsNote("渠道属于账号，停用会暂停站外发送。设备通知请在本地提醒中单独设置。")
   }
   deleteId?.let { id ->
     ConfirmDeleteDialog("删除渠道", "确认删除此 Webhook 渠道？", onDismiss = { deleteId = null }) {
@@ -261,20 +279,21 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
       }
   }
 
-  Column(
-    Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
-      .padding(AppDimens.pageGutter),
-    verticalArrangement = Arrangement.spacedBy(AppDimens.sectionGap)
-  ) {
+  SettingsPage(contentPadding) {
+    SettingsHero(Icons.Outlined.Webhook, "站外提醒", if (channelId == null) "连接一个提醒渠道" else "调整提醒目的地",
+      "保存连接信息，再到事件中选择这个渠道。")
     FormSection("渠道信息") {
       OutlinedTextField(name, { name = it }, label = { FormFieldLabel("渠道名称", required = true) },
         shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
       OutlinedTextField(account, { account = it }, label = { FormFieldLabel("Webhook HTTPS 地址", required = true) },
         shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
       SelectionField("消息格式", format, formats, { format = it })
+    }
+    FormSection("消息与安全") {
       OutlinedTextField(
         token, { token = it }, label = { Text(if (existing?.hasAuthToken == true) "Token（留空保持原值）" else "Token（可选）") },
-        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()
+        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(),
+        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
       )
       if (format == "custom") {
         OutlinedTextField(
@@ -283,6 +302,8 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
         )
         Text("支持 {{title}} 和 {{content}}，字符串占位符需放在引号内", style = MaterialTheme.typography.bodySmall)
       }
+    }
+    FormSection("发送状态") {
       if (channelId != null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text("启用渠道", modifier = Modifier.weight(1f))
@@ -319,7 +340,6 @@ fun ChannelEditorScreen(vm: MainViewModel, channelId: Int?, onSaved: () -> Unit,
         Text("保存渠道")
       }
     }
-    Text("测试会发送一条消息，不会保存当前修改。请求完成不代表接收端已送达。", style = MaterialTheme.typography.bodySmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant)
+    SettingsNote("测试会发送一条消息，不会保存当前修改。请求完成不代表接收端已送达，请检查接收端。")
   }
 }

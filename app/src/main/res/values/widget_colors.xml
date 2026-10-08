@@ -1,1 +1,7 @@
-<resources><color name="widget_background">#FFF8F4</color><color name="widget_foreground">#292421</color></resources>
+<resources>
+  <color name="widget_background">#FBFCFE</color>
+  <color name="widget_foreground">#182234</color>
+  <color name="widget_secondary">#7C8798</color>
+  <color name="widget_accent">#3478F6</color>
+  <color name="widget_tint">#EAF1FF</color>
+</resources>

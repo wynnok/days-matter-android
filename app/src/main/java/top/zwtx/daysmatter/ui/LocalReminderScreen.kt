@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,35 +45,58 @@ fun LocalReminderScreen(vm: MainViewModel, onConfigure: (Int) -> Unit, contentPa
   val granted = remember(revision) { notifications.permissionGranted }
   val enabled = remember(revision) { notifications.appEnabled }
   val channel = remember(revision) { notifications.channelEnabled }
-  Column(Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState())
-    .padding(AppDimens.pageGutter), verticalArrangement = Arrangement.spacedBy(AppDimens.itemGap)) {
-    Text("当前设备的本地提醒", style = MaterialTheme.typography.titleLarge)
-    Text("通知权限：${if (granted) "已授予" else "未授予"}")
-    Text("系统应用通知：${if (enabled) "已开启" else "已关闭"}")
-    Text("事件提醒渠道：${if (channel) "已开启" else "已关闭"}")
-    if (!granted && Build.VERSION.SDK_INT >= 33) {
-      OutlinedButton(onClick = { permission.launch(Manifest.permission.POST_NOTIFICATIONS) }) { Text("申请通知权限") }
-    }
-    OutlinedButton(onClick = {
-      context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
-    }) { Text("系统通知设置") }
-    Button(onClick = { vm.showMessage(notifications.test()); revision++ }) { Text("测试通知") }
-    Text("测试只验证当前通知展示，不保证未来精确送达。省电、后台限制或系统延迟可能影响定时提醒；请检查通知权限、事件提醒渠道和电池设置。")
-    HorizontalDivider()
-    Text("已启用提醒的事件", style = MaterialTheme.typography.titleMedium)
-    val events = vm.snapshot?.events?.filter { vm.localReminder(it.id).enabled }
-    if (events == null) Text("尚无已同步数据，请先同步以查看本地提醒")
-    else if (events.isEmpty()) Text("尚未启用本地提醒，可在事件编辑页逐事件设置")
-    events?.forEach { event ->
-      GlassPanel {
-        Column(Modifier.fillMaxWidth().padding(AppDimens.cardInset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text(event.name, style = MaterialTheme.typography.titleMedium)
-          Text(reminderTiming(event, vm.localReminder(event.id), now).label())
-          TextButton(onClick = { onConfigure(event.id) }) { Text("配置 ${event.name} 的本地提醒") }
-        }
+  val events = vm.snapshot?.events?.filter { vm.localReminder(it.id).enabled }
+  val ready = granted && enabled && channel
+  val openSettings: () -> Unit = {
+    context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+  }
+  val testNotification: () -> Unit = { vm.showMessage(notifications.test()); revision++ }
+  SettingsPage(contentPadding) {
+    SettingsHero(Icons.Outlined.NotificationsActive, "当前设备", if (ready) "通知已就绪" else "通知需要设置",
+      "为重要的日子，留一声及时的提醒。")
+    SettingsSection("通知状态") {
+      SettingsStatus("通知权限", if (granted) "已授予" else "未授予", granted)
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+      SettingsStatus("系统应用通知", if (enabled) "已开启" else "已关闭", enabled)
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+      SettingsStatus("事件提醒渠道", if (channel) "已开启" else "已关闭", channel)
+      if (!granted && Build.VERSION.SDK_INT >= 33) {
+        Button(onClick = { permission.launch(Manifest.permission.POST_NOTIFICATIONS) },
+          modifier = Modifier.fillMaxWidth().heightIn(min = AppDimens.controlHeight)) { Text("申请通知权限") }
+      }
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedButton(onClick = openSettings, modifier = Modifier.weight(1f).heightIn(min = AppDimens.controlHeight),
+          contentPadding = PaddingValues(horizontal = 8.dp)) { Text("系统通知设置") }
+        if (ready) Button(onClick = testNotification, modifier = Modifier.weight(1f).heightIn(min = AppDimens.controlHeight)) { Text("测试通知") }
+        else OutlinedButton(onClick = testNotification, modifier = Modifier.weight(1f).heightIn(min = AppDimens.controlHeight)) { Text("测试通知") }
       }
     }
-    Text("本地提醒只属于当前设备；站外提醒渠道属于账号，分别管理。")
-    TextButton(onClick = vm::refresh, enabled = !vm.busy) { Text("同步事件") }
+    SettingsSection("已启用提醒的事件", "${events?.size ?: 0} 个") {
+      when {
+        events == null -> SettingsEmpty(Icons.Outlined.NotificationsNone, "尚无已同步数据", "同步事件后，可查看本地提醒。")
+        events.isEmpty() -> SettingsEmpty(Icons.Outlined.NotificationsNone, "还没有启用提醒", "在事件编辑页，为需要的日子开启本地提醒。")
+        else -> events.forEachIndexed { index, event ->
+          if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+          Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(event.name, style = MaterialTheme.typography.titleMedium)
+            Text(reminderTiming(event, vm.localReminder(event.id), now).label(), style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = { onConfigure(event.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = AppDimens.controlHeight)) {
+              Text("配置 ${event.name} 的本地提醒")
+            }
+          }
+        }
+      }
+      OutlinedButton(onClick = vm::refresh, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().heightIn(min = AppDimens.controlHeight)) {
+        Icon(Icons.Outlined.Sync, null, Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(if (vm.refreshing) "同步中…" else "同步事件")
+      }
+    }
+    SettingsDisclosure("提醒为什么没有出现？", "检查通知设置、后台运行与省电限制") {
+      Text("测试只验证当前通知展示，不保证未来精确送达。", style = MaterialTheme.typography.bodyMedium)
+      SettingsNote("省电、后台限制或系统延迟可能影响定时提醒；请检查通知权限、事件提醒渠道和电池设置。")
+    }
+    SettingsNote("本地提醒只属于当前设备；站外提醒渠道属于账号，分别管理。")
   }
 }

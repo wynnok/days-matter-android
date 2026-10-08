@@ -8,8 +8,13 @@ import android.os.Looper
 import android.widget.TextView
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.graphics.asAndroidBitmap
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.*
@@ -66,8 +71,8 @@ class WidgetConfigurationFlowTest {
   @Test fun systemConfigurationSavesFixedEventAndActualWidgetClickRetainsOwner() {
     val id = allocate()
     val activity = configure(id)
-    compose.onNodeWithText("第一个固定事件").performClick()
-    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    compose.onNodeWithText("第一个固定事件").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performClick()
     compose.runOnIdle {
       assertEquals(android.app.Activity.RESULT_OK, shadowOf(activity.get()).resultCode)
       assertEquals(id, shadowOf(activity.get()).resultIntent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1))
@@ -83,8 +88,8 @@ class WidgetConfigurationFlowTest {
   }
   private fun chooseAndSave(id: Int, event: String) {
     val controller = configure(id)
-    compose.onNodeWithText(event).performClick()
-    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    compose.onNodeWithText(event).performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performClick()
     controller.pause().stop().destroy()
   }
 
@@ -96,8 +101,8 @@ class WidgetConfigurationFlowTest {
     assertEquals("第一个固定事件", renderedName(first))
     assertEquals("第二个固定事件", renderedName(second))
     val reconfigure = configure(first)
-    compose.onNodeWithText("第二个固定事件").performClick()
-    compose.onNodeWithText("取消").performScrollTo().performClick()
+    compose.onNodeWithText("第二个固定事件").performScrollTo().performClick()
+    compose.onNodeWithText("取消").performClick()
     assertEquals(android.app.Activity.RESULT_CANCELED, shadowOf(reconfigure.get()).resultCode)
     reconfigure.pause().stop().destroy()
     ImportantDayWidgetProvider.updateAll(app)
@@ -111,8 +116,8 @@ class WidgetConfigurationFlowTest {
   @Test fun cancellingNewConfigurationLeavesNoEventContentOrBinding() {
     val id = allocate()
     val controller = configure(id)
-    compose.onNodeWithText("第一个固定事件").performClick()
-    compose.onNodeWithText("取消").performScrollTo().performClick()
+    compose.onNodeWithText("第一个固定事件").performScrollTo().performClick()
+    compose.onNodeWithText("取消").performClick()
     assertEquals(android.app.Activity.RESULT_CANCELED, shadowOf(controller.get()).resultCode)
     controller.pause().stop().destroy()
     ImportantDayWidgetProvider.update(app, id)
@@ -123,9 +128,9 @@ class WidgetConfigurationFlowTest {
   @Test fun changingAccountBeforeSavingRejectsStaleSelection() {
     val id = allocate()
     val controller = configure(id)
-    compose.onNodeWithText("第一个固定事件").performClick()
+    compose.onNodeWithText("第一个固定事件").performScrollTo().performClick()
     store.saveSession(Session(8, "Other", "other@example.com", "synthetic-other"))
-    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performClick()
     compose.onNodeWithText("账号或事件已变化，请重新选择").assertExists()
     assertEquals(android.app.Activity.RESULT_CANCELED, shadowOf(controller.get()).resultCode)
     controller.pause().stop().destroy()
@@ -216,7 +221,7 @@ class WidgetConfigurationFlowTest {
       assertEquals("还有 3 天", days.text.toString())
       val date = view.findViewById<TextView>(R.id.widget_date)
       assertEquals("核心发生日期不能被省略", 0, date.layout.getEllipsisCount(0))
-      assertEquals(android.graphics.Color.parseColor("#FFF1E9"), days.currentTextColor)
+      assertEquals(android.graphics.Color.parseColor("#F3F5FA"), days.currentTextColor)
       assertTrue("天数的行宽必须适合尺寸 $width x $height", days.layout.getLineWidth(0) <= days.width - days.compoundPaddingLeft - days.compoundPaddingRight + 1)
       fun checkBounds(node: android.view.View, parentTop: Int = 0) {
         val top = parentTop + node.top
@@ -242,41 +247,41 @@ class WidgetConfigurationFlowTest {
       configure = ComponentName(app, WidgetConfigurationActivity::class.java)
     })
     val controller = configure(id)
-    compose.onNodeWithText("近期 30 天（已选）").assertExists()
-    compose.onNodeWithText("近期 7 天").performClick()
-    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    compose.onNodeWithText("近期 30 天").assertExists()
+    compose.onNodeWithText("近期 7 天").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performClick()
     assertEquals(android.app.Activity.RESULT_OK, shadowOf(controller.get()).resultCode)
-    assertEquals("近期 7 天 · 全部", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_title).text.toString())
+    assertEquals("未来 7 天 · 全部分类", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_scope).text.toString())
     controller.pause().stop().destroy()
     val reconfigure = configure(id)
-    compose.onNodeWithText("近期 30 天").performClick()
-    compose.onNodeWithText("取消").performScrollTo().performClick()
+    compose.onNodeWithText("近期 30 天").performScrollTo().performClick()
+    compose.onNodeWithText("取消").performClick()
     reconfigure.pause().stop().destroy()
     UpcomingWidgetProvider.updateAll(app)
-    assertEquals("近期 7 天 · 全部", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_title).text.toString())
+    assertEquals("未来 7 天 · 全部分类", shadowOf(manager).getViewFor(id).findViewById<TextView>(R.id.upcoming_scope).text.toString())
   }
 
   @Test fun perInstanceAppearanceSurvivesReconfigurationAndDoesNotChangeApplicationPreference() {
     val light = allocate()
     val dark = allocate()
     val first = configure(light)
-    compose.onNodeWithText("第一个固定事件").performClick()
+    compose.onNodeWithText("第一个固定事件").performScrollTo().performClick()
     compose.onNodeWithText("浅色").performScrollTo().performClick()
-    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performClick()
     first.pause().stop().destroy()
     val second = configure(dark)
-    compose.onNodeWithText("第二个固定事件").performClick()
+    compose.onNodeWithText("第二个固定事件").performScrollTo().performClick()
     compose.onNodeWithText("深色").performScrollTo().performClick()
-    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performClick()
     second.pause().stop().destroy()
     val canceled = configure(light)
     compose.onNodeWithText("深色").performScrollTo().performClick()
-    compose.onNodeWithText("取消").performScrollTo().performClick()
+    compose.onNodeWithText("取消").performClick()
     canceled.pause().stop().destroy()
     RuntimeEnvironment.setQualifiers("w411dp-h891dp-night")
     ImportantDayWidgetProvider.updateAll(app)
-    assertEquals(android.graphics.Color.parseColor("#292421"), shadowOf(manager).getViewFor(light).findViewById<TextView>(R.id.widget_name).currentTextColor)
-    assertEquals(android.graphics.Color.parseColor("#FFF1E9"), shadowOf(manager).getViewFor(dark).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    assertEquals(android.graphics.Color.parseColor("#182234"), shadowOf(manager).getViewFor(light).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    assertEquals(android.graphics.Color.parseColor("#F3F5FA"), shadowOf(manager).getViewFor(dark).findViewById<TextView>(R.id.widget_name).currentTextColor)
     assertEquals(top.zwtx.daysmatter.data.AppearanceMode.SYSTEM, store.appearanceMode())
     assertEquals("第一个固定事件", renderedName(light))
     assertEquals("第二个固定事件", renderedName(dark))
@@ -289,19 +294,74 @@ class WidgetConfigurationFlowTest {
     shadowOf(manager).putWidgetInfo(recent, AppWidgetProviderInfo().apply { provider = ComponentName(app, UpcomingWidgetProvider::class.java) })
     val controller = configure(recent)
     compose.onNodeWithText("深色").performScrollTo().performClick()
-    compose.onNodeWithText("保存到桌面").performScrollTo().performClick()
+    compose.onNodeWithText("保存到桌面").performClick()
     controller.pause().stop().destroy()
     RuntimeEnvironment.setQualifiers("w411dp-h891dp-notnight")
     ImportantDayWidgetProvider.updateAll(app)
     UpcomingWidgetProvider.updateAll(app)
-    assertEquals(android.graphics.Color.parseColor("#FFF1E9"), shadowOf(manager).getViewFor(recent).findViewById<TextView>(R.id.upcoming_title).currentTextColor)
-    assertEquals(android.graphics.Color.parseColor("#292421"), shadowOf(manager).getViewFor(fixed).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    assertEquals(android.graphics.Color.parseColor("#F3F5FA"), shadowOf(manager).getViewFor(recent).findViewById<TextView>(R.id.upcoming_title).currentTextColor)
+    assertEquals(android.graphics.Color.parseColor("#182234"), shadowOf(manager).getViewFor(fixed).findViewById<TextView>(R.id.widget_name).currentTextColor)
     RuntimeEnvironment.setQualifiers("w411dp-h891dp-night")
     ImportantDayWidgetProvider.updateAll(app)
     UpcomingWidgetProvider.updateAll(app)
-    assertEquals(android.graphics.Color.parseColor("#FFF1E9"), shadowOf(manager).getViewFor(fixed).findViewById<TextView>(R.id.widget_name).currentTextColor)
+    assertEquals(android.graphics.Color.parseColor("#F3F5FA"), shadowOf(manager).getViewFor(fixed).findViewById<TextView>(R.id.widget_name).currentTextColor)
     assertEquals("第一个固定事件", renderedName(fixed))
-    assertEquals("近期 30 天 · 全部", shadowOf(manager).getViewFor(recent).findViewById<TextView>(R.id.upcoming_title).text.toString())
+    assertEquals("未来 30 天 · 全部分类", shadowOf(manager).getViewFor(recent).findViewById<TextView>(R.id.upcoming_scope).text.toString())
+  }
+
+  @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+  fun groupedRecentConfigurationPreviewsChoicesAndSavesCategoryAndAppearance() {
+    val raw = store.loadSnapshot(7)!!.raw
+    raw.put("categories", JSONArray().put(JSONObject().put("category_id", 1).put("category_name", "生活"))
+      .put(JSONObject().put("category_id", 2).put("category_name", "工作")))
+    raw.getJSONArray("events").getJSONObject(0).put("category_id", 1)
+    store.saveSnapshot(7, Snapshot.fromJson(raw))
+    val id = shadowOf(manager).createWidget(UpcomingWidgetProvider::class.java, R.layout.upcoming_widget)
+    shadowOf(manager).putWidgetInfo(id, AppWidgetProviderInfo().apply { provider = ComponentName(app, UpcomingWidgetProvider::class.java) })
+    val controller = configure(id)
+    compose.onNodeWithText("近期 30 天").assertIsSelected()
+    compose.onNodeWithText("近期 7 天").performScrollTo().performClick()
+    compose.onNodeWithText("近期 7 天").assertIsSelected()
+    compose.onNodeWithText("全部分类").performScrollTo().performClick()
+    compose.onNodeWithText("生活").performClick()
+    compose.onNodeWithText("生活").assertExists()
+    val output = java.io.File("build/widget-previews").apply { mkdirs() }
+    // Return to the top to capture the real configuration screen, including its live RemoteViews preview.
+    compose.onNodeWithText("桌面预览").performScrollTo()
+    compose.onRoot().captureToImage().asAndroidBitmap().let { bitmap ->
+      java.io.File(output, "configuration-light.png").outputStream().use {
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+      }
+    }
+    compose.onNodeWithText("深色").performScrollTo().performClick()
+    compose.onNodeWithText("深色").assertIsSelected()
+    compose.onNodeWithText("保存到桌面").performClick()
+    assertEquals(1, WidgetStore(app).upcoming(id)?.categoryId)
+    assertEquals(7, WidgetStore(app).upcoming(id)?.window)
+    assertEquals(top.zwtx.daysmatter.data.AppearanceMode.DARK, WidgetStore(app).appearance(id))
+    assertEquals(android.app.Activity.RESULT_OK, shadowOf(controller.get()).resultCode)
+    controller.pause().stop().destroy()
+  }
+
+  @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-night")
+  @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+  fun nightConfigurationKeepsSaveVisibleWithLargerFonts() {
+    RuntimeEnvironment.setFontScale(1.3f)
+    val id = shadowOf(manager).createWidget(UpcomingWidgetProvider::class.java, R.layout.upcoming_widget)
+    shadowOf(manager).putWidgetInfo(id, AppWidgetProviderInfo().apply { provider = ComponentName(app, UpcomingWidgetProvider::class.java) })
+    val controller = configure(id)
+    compose.onNodeWithText("近期 7 天").performScrollTo().performClick()
+    compose.onNodeWithText("桌面预览").performScrollTo()
+    compose.onNodeWithText("保存到桌面").assertIsDisplayed()
+    compose.onRoot().captureToImage().asAndroidBitmap().let { bitmap ->
+      val output = java.io.File("build/widget-previews").apply { mkdirs() }
+      java.io.File(output, "configuration-night-large-font.png").outputStream().use {
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+      }
+    }
+    compose.onNodeWithText("保存到桌面").performClick()
+    assertEquals(7, WidgetStore(app).upcoming(id)?.window)
+    controller.pause().stop().destroy()
   }
 
 }

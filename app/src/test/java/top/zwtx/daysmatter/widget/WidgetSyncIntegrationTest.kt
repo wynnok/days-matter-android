@@ -80,7 +80,7 @@ class WidgetSyncIntegrationTest {
     compose.runOnIdle { vm.logout() }
     assertEquals("请登录以查看重要日子", text(R.id.widget_days))
     assertEquals("重要日子", text(R.id.widget_name))
-    assertEquals("请登录以查看近期日程", shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_row_1).text.toString())
+    assertEquals("请登录以查看近期日程", shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_empty_title).text.toString())
   }
 
   @Test fun expiredAuthenticationImmediatelyHidesDesktopAccountData() {
@@ -88,7 +88,7 @@ class WidgetSyncIntegrationTest {
     compose.runOnIdle { vm.refresh() }
     waitForRequest()
     assertNull(vm.session)
-    assertEquals("请登录以查看近期日程", shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_row_1).text.toString())
+    assertEquals("请登录以查看近期日程", shadowOf(manager).getViewFor(recentId).findViewById<TextView>(R.id.upcoming_empty_title).text.toString())
     assertEquals("请登录以查看重要日子", text(R.id.widget_days))
     assertFalse(shadowOf(manager).getViewFor(widgetId).contentDescription.toString().contains("目标事件"))
   }

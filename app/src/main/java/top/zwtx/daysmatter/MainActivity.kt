@@ -350,7 +350,6 @@ internal fun DaysMatterApp(vm: MainViewModel) {
               onImport = { if (vm.beginImportSelection()) importLauncher.launch(arrayOf("application/json", "text/plain")) },
               onHelp = { page = "help" },
               onLocalReminders = { page = "local_reminders" },
-              onCategories = { page = "categories" },
               onWidgets = { page = "widgets" },
               displaySnapshot = displaySnapshot,
               contentPadding = screenPadding
